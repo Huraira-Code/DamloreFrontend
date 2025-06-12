@@ -68,20 +68,36 @@ export default function Sidebar({
   selectedClients,
   setSelectedClients,
   onSearch, // The new prop for the search handler
+  ClearFilter,
 }) {
   // Dialog states remain local to Sidebar
   const [bulkSkuDialogOpen, setBulkSkuDialogOpen] = useState(false);
   const [bulkBarcodeDialogOpen, setBulkBarcodeDialogOpen] = useState(false);
-  const [bulkFarfetchIdDialogOpen, setBulkFarfetchIdDialogOpen] = useState(false);
+  const [bulkFarfetchIdDialogOpen, setBulkFarfetchIdDialogOpen] =
+    useState(false);
 
   const [users, setUsers] = useState([]);
 
   // Sample filter options (these can remain in Sidebar or be lifted if shared)
   const assetTypes = ["On Model", "Ghost", "Still Life", "Video"];
   const merchandisingClasses = [
-    "SOCKS", "SET UNDERWEAR", "SCARF", "SMALL LEATHER GOODS", "SUNGLASSES",
-    "TIES", "TOWEL", "RTW (READY-TO-WEAR)", "ACCESSORIES", "GLOVES",
-    "JEWELRY", "KEY CHAINS", "PAPILLONS", "RINGS", "BAGS", "BELTS", "SHOES",
+    "SOCKS",
+    "SET UNDERWEAR",
+    "SCARF",
+    "SMALL LEATHER GOODS",
+    "SUNGLASSES",
+    "TIES",
+    "TOWEL",
+    "RTW (READY-TO-WEAR)",
+    "ACCESSORIES",
+    "GLOVES",
+    "JEWELRY",
+    "KEY CHAINS",
+    "PAPILLONS",
+    "RINGS",
+    "BAGS",
+    "BELTS",
+    "SHOES",
   ];
   const genders = ["Men", "Women", "Unisex"];
   const seasons = ["SS24", "FW24", "SS25"];
@@ -136,6 +152,7 @@ export default function Sidebar({
       }
     });
   };
+  // Function to clear all filters
 
   const baseClasses = "flex items-center gap-3 px-3 py-2 text-sm rounded-md";
   const activeClasses = "bg-blue-50 text-blue-600";
@@ -202,7 +219,9 @@ export default function Sidebar({
           href="#"
           onClick={() => setActivePage("digitalAssetManagement")}
           className={`${baseClasses} ${
-            activePage === "digitalAssetManagement" ? activeClasses : inactiveClasses
+            activePage === "digitalAssetManagement"
+              ? activeClasses
+              : inactiveClasses
           }`}
         >
           <Folder className="h-5 w-5" />
@@ -624,11 +643,18 @@ export default function Sidebar({
         </Accordion>
 
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="w-full">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={ClearFilter}
+          >
             <X className="h-3.5 w-3.5 mr-1" />
             Clear
           </Button>
-          <Button size="sm" className="w-full" onClick={onSearch}> {/* Call onSearch prop */}
+          <Button size="sm" className="w-full" onClick={onSearch}>
+            {" "}
+            {/* Call onSearch prop */}
             <Search className="h-3.5 w-3.5 mr-1" />
             Search
           </Button>

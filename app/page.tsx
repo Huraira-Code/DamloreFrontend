@@ -16,7 +16,8 @@ export default function Home() {
   const [skuFilter, setSkuFilter] = useState("");
   const [barcodeFilter, setBarcodeFilter] = useState("");
   const [farfetchIdFilter, setFarfetchIdFilter] = useState("");
-  const [selectedMerchandisingClasses, setSelectedMerchandisingClasses] = useState([]);
+  const [selectedMerchandisingClasses, setSelectedMerchandisingClasses] =
+    useState([]);
   const [selectedSeasons, setSelectedSeasons] = useState([]);
   const [selectedGenders, setSelectedGenders] = useState([]);
   const [selectedAssetTypes, setSelectedAssetTypes] = useState([]);
@@ -57,6 +58,23 @@ export default function Home() {
     });
     // You might also want to change the active page to a results page if needed
     // setActivePage("digitalAssetManagement");
+  };
+
+  // Updated ClearFilter function to reset all individual filter states
+  const ClearFilter = () => {
+    setBulkSkuCodes("");
+    setBulkBarcodeCodes("");
+    setBulkFarfetchIdCodes("");
+    setSkuFilter("");
+    setBarcodeFilter("");
+    setFarfetchIdFilter("");
+    setSelectedMerchandisingClasses([]);
+    setSelectedSeasons([]);
+    setSelectedGenders([]);
+    setSelectedAssetTypes([]);
+    setSelectedClients([]);
+    setAppliedFilters({}); // Also clear the applied filters
+    console.log("All filters cleared!");
   };
 
   const renderPage = () => {
@@ -102,6 +120,7 @@ export default function Home() {
         selectedClients={selectedClients}
         setSelectedClients={setSelectedClients}
         onSearch={handleSearch} // Pass the search handler
+        ClearFilter={ClearFilter}
       />
       <main className="flex-1">{renderPage()}</main>
     </div>
