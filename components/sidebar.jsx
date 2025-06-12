@@ -1,3 +1,4 @@
+// In components/sidebar.jsx
 "use client";
 
 import Link from "next/link";
@@ -28,7 +29,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { useEffect, useState } from "react"; // Keep useState for dialogs
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -36,56 +37,56 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserManagement } from "@/components/user_management";
-export default function Sidebar({ setActivePage, activePage }) {
+
+import { UserManagement } from "@/components/user_management"; // Assuming this is correct
+import axios from "axios";
+
+// Destructure all the props passed from Home
+export default function Sidebar({
+  setActivePage,
+  activePage,
+  bulkSkuCodes,
+  setBulkSkuCodes,
+  bulkBarcodeCodes,
+  setBulkBarcodeCodes,
+  bulkFarfetchIdCodes,
+  setBulkFarfetchIdCodes,
+  skuFilter,
+  setSkuFilter,
+  barcodeFilter,
+  setBarcodeFilter,
+  farfetchIdFilter,
+  setFarfetchIdFilter,
+  selectedMerchandisingClasses,
+  setSelectedMerchandisingClasses,
+  selectedSeasons,
+  setSelectedSeasons,
+  selectedGenders,
+  setSelectedGenders,
+  selectedAssetTypes,
+  setSelectedAssetTypes,
+  selectedClients,
+  setSelectedClients,
+  onSearch, // The new prop for the search handler
+}) {
+  // Dialog states remain local to Sidebar
   const [bulkSkuDialogOpen, setBulkSkuDialogOpen] = useState(false);
   const [bulkBarcodeDialogOpen, setBulkBarcodeDialogOpen] = useState(false);
-  const [bulkFarfetchIdDialogOpen, setBulkFarfetchIdDialogOpen] =
-    useState(false);
-  const [bulkSkuCodes, setBulkSkuCodes] = useState("");
-  const [bulkBarcodeCodes, setBulkBarcodeCodes] = useState("");
-  const [bulkFarfetchIdCodes, setBulkFarfetchIdCodes] = useState("");
-  const [selectedMerchandisingClasses, setSelectedMerchandisingClasses] =
-    useState([]);
-  const [selectedSeasons, setSelectedSeasons] = useState([]);
-  const [selectedGenders, setSelectedGenders] = useState([]);
-  const [selectedAssetTypes, setSelectedAssetTypes] = useState([]);
-  const [selectedClients, setSelectedClients] = useState([]);
+  const [bulkFarfetchIdDialogOpen, setBulkFarfetchIdDialogOpen] = useState(false);
 
-  // Sample filter options
+  const [users, setUsers] = useState([]);
+
+  // Sample filter options (these can remain in Sidebar or be lifted if shared)
   const assetTypes = ["On Model", "Ghost", "Still Life", "Video"];
   const merchandisingClasses = [
-    "SOCKS",
-    "SET UNDERWEAR",
-    "SCARF",
-    "SMALL LEATHER GOODS",
-    "SUNGLASSES",
-    "TIES",
-    "TOWEL",
-    "RTW (READY-TO-WEAR)",
-    "ACCESSORIES",
-    "GLOVES",
-    "JEWELRY",
-    "KEY CHAINS",
-    "PAPILLONS",
-    "RINGS",
-    "BAGS",
-    "BELTS",
-    "SHOES",
+    "SOCKS", "SET UNDERWEAR", "SCARF", "SMALL LEATHER GOODS", "SUNGLASSES",
+    "TIES", "TOWEL", "RTW (READY-TO-WEAR)", "ACCESSORIES", "GLOVES",
+    "JEWELRY", "KEY CHAINS", "PAPILLONS", "RINGS", "BAGS", "BELTS", "SHOES",
   ];
   const genders = ["Men", "Women", "Unisex"];
   const seasons = ["SS24", "FW24", "SS25"];
-  const clients = [
-    "Farfetch",
-    "Mytheresa",
-    "Luisaviaroma",
-    "YNAP",
-    "Zalando",
-    "Moda Operandi",
-    "Net-a-Porter",
-    "Matches Fashion",
-  ];
 
+  // Toggle functions now use the setter functions passed as props
   const toggleMerchandisingClass = (value) => {
     setSelectedMerchandisingClasses((prev) => {
       if (prev.includes(value)) {
@@ -137,13 +138,35 @@ export default function Sidebar({ setActivePage, activePage }) {
   };
 
   const baseClasses = "flex items-center gap-3 px-3 py-2 text-sm rounded-md";
-  // Classes for the active link
   const activeClasses = "bg-blue-50 text-blue-600";
-  // Classes for inactive links
   const inactiveClasses = "hover:bg-slate-100 text-slate-500";
+  const API_BASE_URL = "https://damlorefinal.vercel.app";
+  const BEARER_TOKEN =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODQxMzNiZjA3MGVjMjY0NThlOTIxZjYiLCJlbWFpbCI6Imh1cmFpcmFzaGFoaWQwMDBAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzQ5MTAzNTk5LCJleHAiOjE3NTE2OTU1OTl9.ZvZr2jE2pEpxMnn4bYKdkqY1GoDmhts2zCecekHbbSA";
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/admin/users`, {
+        headers: {
+          Authorization: `Bearer ${BEARER_TOKEN}`,
+        },
+      });
+      setUsers(response.data.users);
+    } catch (err) {
+      console.log(err);
+      setUsers([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   return (
-    <div className="w-72 border-r bg-white h-screen sticky top-0 flex flex-col">
+    <div
+      className="w-72 border-r bg-white h-screen sticky top-0 flex flex-col"
+      style={{ overflowY: "scroll" }}
+    >
       <div className="flex items-center gap-3 p-4 border-b">
         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
           <span className="text-blue-600 font-semibold text-sm">P</span>
@@ -156,70 +179,54 @@ export default function Sidebar({ setActivePage, activePage }) {
         <Link
           href="#"
           onClick={() => setActivePage("dashboard")}
-          className={`flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
-            activePage === "dashboard"
-              ? "bg-blue-50 text-blue-600"
-              : "hover:bg-slate-100 text-slate-500"
+          className={`${baseClasses} ${
+            activePage === "dashboard" ? activeClasses : inactiveClasses
           }`}
         >
-          <LayoutGrid className="h-5 w-5" />{" "}
-          {/* Icon color handled by parent text color */}
+          <LayoutGrid className="h-5 w-5" />
           <span>Dashboard</span>
         </Link>
 
         <Link
           href="#"
           onClick={() => setActivePage("assetApproval")}
-          className={`flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
-            activePage === "assetApproval"
-              ? "bg-blue-50 text-blue-600"
-              : "hover:bg-slate-100 text-slate-500"
+          className={`${baseClasses} ${
+            activePage === "assetApproval" ? activeClasses : inactiveClasses
           }`}
         >
-          <CheckSquare className="h-5 w-5" />{" "}
-          {/* Icon color handled by parent text color */}
+          <CheckSquare className="h-5 w-5" />
           <span>Asset Approval</span>
         </Link>
 
         <Link
           href="#"
           onClick={() => setActivePage("digitalAssetManagement")}
-          className={`flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
-            activePage === "digitalAssetManagement"
-              ? "bg-blue-50 text-blue-600"
-              : "hover:bg-slate-100 text-slate-500"
+          className={`${baseClasses} ${
+            activePage === "digitalAssetManagement" ? activeClasses : inactiveClasses
           }`}
         >
-          <Folder className="h-5 w-5" />{" "}
-          {/* Icon color handled by parent text color */}
+          <Folder className="h-5 w-5" />
           <span>Digital Asset Management</span>
         </Link>
         <Link
           href="#"
           onClick={() => setActivePage("userManagement")}
-          className={`flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
-            activePage === "userManagement"
-              ? "bg-blue-50 text-blue-600"
-              : "hover:bg-slate-100 text-slate-500"
+          className={`${baseClasses} ${
+            activePage === "userManagement" ? activeClasses : inactiveClasses
           }`}
         >
-          {" "}
-          <Folder className="h-5 w-5" />{" "}
-          {/* Icon color handled by parent text color */}
+          <Folder className="h-5 w-5" />
           <span>User Management</span>
         </Link>
 
         <Link
           href="#"
           onClick={() => setActivePage("settings")}
-          className={`flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
-            activePage === "settings"
-              ? "bg-blue-50 text-blue-600"
-              : "hover:bg-slate-100 text-slate-500"
+          className={`${baseClasses} ${
+            activePage === "settings" ? activeClasses : inactiveClasses
           }`}
         >
-          <Settings className="h-5 w-5" />{" "}
-          {/* Icon color handled by parent text color */}
+          <Settings className="h-5 w-5" />
           <span>Settings</span>
         </Link>
       </nav>
@@ -244,19 +251,6 @@ export default function Sidebar({ setActivePage, activePage }) {
             <AccordionTrigger className="text-sm py-2">Client</AccordionTrigger>
             <AccordionContent>
               <div className="space-y-2">
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {selectedClients.map((client) => (
-                    <Badge
-                      key={client}
-                      variant="outline"
-                      className="flex items-center gap-1 bg-white"
-                      onClick={() => toggleClient(client)}
-                    >
-                      <X className="h-3 w-3" />
-                      {client}
-                    </Badge>
-                  ))}
-                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -272,13 +266,13 @@ export default function Sidebar({ setActivePage, activePage }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56">
-                    {clients.map((client) => (
+                    {users.map((client) => (
                       <DropdownMenuCheckboxItem
-                        key={client}
+                        key={client.name}
                         checked={selectedClients.includes(client)}
                         onCheckedChange={() => toggleClient(client)}
                       >
-                        {client}
+                        {client?.name}
                       </DropdownMenuCheckboxItem>
                     ))}
                   </DropdownMenuContent>
@@ -339,7 +333,12 @@ export default function Sidebar({ setActivePage, activePage }) {
             <AccordionTrigger className="text-sm py-2">SKU</AccordionTrigger>
             <AccordionContent>
               <div className="flex gap-2">
-                <Input placeholder="Filter by SKU..." className="text-sm" />
+                <Input
+                  placeholder="Filter by SKU..."
+                  className="text-sm"
+                  value={skuFilter}
+                  onChange={(e) => setSkuFilter(e.target.value)}
+                />
                 <Dialog
                   open={bulkSkuDialogOpen}
                   onOpenChange={setBulkSkuDialogOpen}
@@ -384,7 +383,12 @@ export default function Sidebar({ setActivePage, activePage }) {
             </AccordionTrigger>
             <AccordionContent>
               <div className="flex gap-2">
-                <Input placeholder="Filter by barcode..." className="text-sm" />
+                <Input
+                  placeholder="Filter by barcode..."
+                  className="text-sm"
+                  value={barcodeFilter}
+                  onChange={(e) => setBarcodeFilter(e.target.value)}
+                />
                 <Dialog
                   open={bulkBarcodeDialogOpen}
                   onOpenChange={setBulkBarcodeDialogOpen}
@@ -575,6 +579,8 @@ export default function Sidebar({ setActivePage, activePage }) {
                 <Input
                   placeholder="Filter by Farfetch ID..."
                   className="text-sm"
+                  value={farfetchIdFilter}
+                  onChange={(e) => setFarfetchIdFilter(e.target.value)}
                 />
                 <Dialog
                   open={bulkFarfetchIdDialogOpen}
@@ -622,7 +628,7 @@ export default function Sidebar({ setActivePage, activePage }) {
             <X className="h-3.5 w-3.5 mr-1" />
             Clear
           </Button>
-          <Button size="sm" className="w-full">
+          <Button size="sm" className="w-full" onClick={onSearch}> {/* Call onSearch prop */}
             <Search className="h-3.5 w-3.5 mr-1" />
             Search
           </Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react"; // Import useMemo
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,8 +24,12 @@ import {
 } from "@/components/ui/select";
 import { Info, XCircle, CheckCircle2 } from "lucide-react";
 
-export default function DigitalAssetManagementPage() {
-  const [sessions, setSessions] = useState([]);
+export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
+  // Store the full, unfiltered sessions data
+  const [allSessions, setAllSessions] = useState([]);
+  // Use this state to display sessions, which will be filtered
+  const [sessionsToDisplay, setSessionsToDisplay] = useState([]);
+
   const [openSessionModal, setOpenSessionModal] = useState(false);
   const [newSession, setNewSession] = useState({ name: "", user: "" });
 
@@ -39,8 +43,8 @@ export default function DigitalAssetManagementPage() {
     size: "",
     dimension: "",
     arrival: "",
-    user: "", // This will hold the assigned user ID
-    images: [], // This is for local preview, actual images will be uploaded separately
+    user: "",
+    images: [],
   });
 
   const [imageModal, setImageModal] = useState({
@@ -48,9 +52,8 @@ export default function DigitalAssetManagementPage() {
     sessionIdx: null,
     listIdx: null,
   });
-  // Changed newImage state to hold an array of files
   const [newImage, setNewImage] = useState({
-    files: [], // Now an array for multiple files
+    files: [],
   });
 
   const [fetchedUsers, setFetchedUsers] = useState([]);
@@ -96,8 +99,8 @@ export default function DigitalAssetManagementPage() {
     }
   };
 
-  // --- Fetch Sessions Function (Updated to fetch images) ---
-  const fetchSessions = async () => {
+  // --- Fetch ALL Sessions and their data (no filters applied here) ---
+  const fetchAllSessions = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/admin/sessions`, {
         headers: {
@@ -106,7 +109,6 @@ export default function DigitalAssetManagementPage() {
       });
 
       if (response.status === 200) {
-        // Use Promise.all to process all sessions concurrently
         const fetchedSessionsPromises = response.data.shootingSessions.map(
           async (session) => {
             const assignedUserObj = fetchedUsers.find(
@@ -116,24 +118,20 @@ export default function DigitalAssetManagementPage() {
               ? assignedUserObj.name
               : "Unknown User";
 
-            // Ensure shootingListIDs is an array, then filter out any non-objects or those without _id
             const shootingListsFromSession =
               session.shootingListIDs && Array.isArray(session.shootingListIDs)
-                ? session.shootingListIDs.filter((list) => list && list._id) // Filter valid lists
+                ? session.shootingListIDs.filter((list) => list && list._id)
                 : [];
 
-            // Fetch images for each shooting list concurrently
             const shootingListsWithFetchedImagesPromises =
               shootingListsFromSession.map(async (list) => {
                 try {
                   const imagesResponse = await axios.get(
-                    `${API_BASE_URL}/admin/images/${list._id}`, // API endpoint for getting images of a list
+                    `${API_BASE_URL}/admin/images/${list._id}`,
                     {
                       headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
                     }
                   );
-                  console.log("Image Response", imagesResponse);
-                  // The backend controller returns { status: "success", imagesData: [...] }
                   return {
                     ...list,
                     images: imagesResponse.data.imagesData || [],
@@ -143,12 +141,10 @@ export default function DigitalAssetManagementPage() {
                     `Failed to fetch images for shooting list ID ${list._id}:`,
                     imageError.response?.data?.msg || imageError.message
                   );
-                  // Return the list with an empty images array on error
                   return { ...list, images: [] };
                 }
               });
 
-            // Wait for all image fetches for this session's lists to complete
             const shootingListsWithFetchedImages = await Promise.all(
               shootingListsWithFetchedImagesPromises
             );
@@ -164,15 +160,11 @@ export default function DigitalAssetManagementPage() {
           }
         );
 
-        // Wait for all session processing (including nested image fetches) to complete
         const fullyPopulatedSessions = await Promise.all(
           fetchedSessionsPromises
         );
-        console.log(
-          "Fully populated sessions with images:",
-          fullyPopulatedSessions
-        );
-        setSessions(fullyPopulatedSessions);
+        // Store the full, unfiltered data
+        setAllSessions(fullyPopulatedSessions);
       }
     } catch (error) {
       console.error("Failed to fetch sessions (overall):", error);
@@ -183,10 +175,11 @@ export default function DigitalAssetManagementPage() {
         type: "error",
       });
       setIsAlertDialogOpen(true);
+      setAllSessions([]); // Clear all sessions on error
     }
   };
 
-  // --- useEffect to fetch data on component mount ---
+  // --- Initial Data Load (Users and then all Sessions) ---
   useEffect(() => {
     const loadInitialData = async () => {
       await fetchUsersMortal();
@@ -194,12 +187,155 @@ export default function DigitalAssetManagementPage() {
     loadInitialData();
   }, []);
 
-  // Fetch sessions only after users are loaded/checked
   useEffect(() => {
     if (fetchedUsers.length > 0 || !isUsersLoading) {
-      fetchSessions();
+      fetchAllSessions(); // Fetch all sessions once users are ready
     }
-  }, [fetchedUsers, isUsersLoading]); // Dependency on fetchedUsers and loading status
+  }, [fetchedUsers, isUsersLoading]);
+
+  // --- Filter Logic (using useMemo for performance) ---
+  const filterSessions = useMemo(() => {
+    let filtered = allSessions;
+
+    // Apply filters based on appliedFilters prop
+    if (Object.keys(appliedFilters).length > 0) {
+      // Example: Filter by SKU (individual input or bulk)
+      if (appliedFilters.skuFilter || appliedFilters.bulkSkuCodes) {
+        const targetSkus = new Set(
+          (appliedFilters.skuFilter ? [appliedFilters.skuFilter] : [])
+            .concat(
+              appliedFilters.bulkSkuCodes
+                ? appliedFilters.bulkSkuCodes.split(/\r?\n/).filter(Boolean)
+                : []
+            )
+            .map((s) => s.toLowerCase())
+        );
+
+        if (targetSkus.size > 0) {
+          console.log("mukesh ambani")
+          console.log(filtered)
+          filtered = filtered.filter((session) =>
+            session.shootingLists.some((list) =>
+              targetSkus.has(list.sku.toLowerCase())
+            )
+          );
+          console.log(filtered)
+        }
+      }
+
+      // Example: Filter by Barcode
+      if (appliedFilters.barcodeFilter || appliedFilters.bulkBarcodeCodes) {
+        const targetBarcodes = new Set(
+          (appliedFilters.barcodeFilter ? [appliedFilters.barcodeFilter] : [])
+            .concat(
+              appliedFilters.bulkBarcodeCodes
+                ? appliedFilters.bulkBarcodeCodes.split(/\r?\n/).filter(Boolean)
+                : []
+            )
+            .map((b) => b.toLowerCase())
+        );
+
+        if (targetBarcodes.size > 0) {
+          filtered = filtered.filter((session) =>
+            session.shootingLists.some((list) =>
+              targetBarcodes.has(list.barcode.toLowerCase())
+            )
+          );
+        }
+      }
+
+      // Example: Filter by Farfetch ID (if you have it on your lists)
+      if (appliedFilters.farfetchIdFilter || appliedFilters.bulkFarfetchIdCodes) {
+        const targetFarfetchIds = new Set(
+          (appliedFilters.farfetchIdFilter ? [appliedFilters.farfetchIdFilter] : [])
+            .concat(
+              appliedFilters.bulkFarfetchIdCodes
+                ? appliedFilters.bulkFarfetchIdCodes.split(/\r?\n/).filter(Boolean)
+                : []
+            )
+            .map((id) => id.toLowerCase())
+        );
+        if (targetFarfetchIds.size > 0) {
+            filtered = filtered.filter(session =>
+                session.shootingLists.some(list =>
+                    targetFarfetchIds.has((list.farfetchId || '').toLowerCase()) // Assuming lists might have farfetchId
+                )
+            );
+        }
+      }
+
+      // Filter by Merchandising Classes (assuming lists have a merchandisingClass field)
+      if (appliedFilters.selectedMerchandisingClasses?.length > 0) {
+        const selectedClasses = new Set(
+          appliedFilters.selectedMerchandisingClasses.map((c) => c.toLowerCase())
+        );
+        filtered = filtered.filter((session) =>
+          session.shootingLists.some((list) =>
+            selectedClasses.has((list.merchandisingClass || '').toLowerCase())
+          )
+        );
+      }
+
+      // Filter by Seasons (assuming sessions or lists have a season field)
+      if (appliedFilters.selectedSeasons?.length > 0) {
+        const selectedSeasons = new Set(
+          appliedFilters.selectedSeasons.map((s) => s.toLowerCase())
+        );
+        filtered = filtered.filter((session) =>
+          session.shootingLists.some((list) =>
+            selectedSeasons.has((list.season || '').toLowerCase()) // Assuming lists might have season
+          )
+        );
+      }
+
+      // Filter by Genders
+      if (appliedFilters.selectedGenders?.length > 0) {
+        const selectedGenders = new Set(
+          appliedFilters.selectedGenders.map((g) => g.toLowerCase())
+        );
+        filtered = filtered.filter((session) =>
+          session.shootingLists.some((list) =>
+            selectedGenders.has((list.gender || '').toLowerCase())
+          )
+        );
+      }
+
+      // Filter by Asset Types (this would typically be a property of the image itself,
+      // or a category for the shooting list, depending on your schema.
+      // For this example, let's assume it's a property of the image.
+      // This filter is more complex as it needs to look deeply into nested images.
+      if (appliedFilters.selectedAssetTypes?.length > 0) {
+        const selectedAssetTypes = new Set(
+          appliedFilters.selectedAssetTypes.map((at) => at.toLowerCase())
+        );
+        filtered = filtered.filter((session) =>
+          session.shootingLists.some((list) =>
+            list.images.some((image) =>
+              selectedAssetTypes.has((image.assetType || '').toLowerCase()) // Assuming image has an assetType
+            )
+          )
+        );
+      }
+
+      // Filter by Clients (users assigned to sessions or shooting lists)
+      if (appliedFilters.selectedClients?.length > 0) {
+          const selectedClientIds = new Set(
+              appliedFilters.selectedClients.map(client => client._id).filter(Boolean)
+          );
+          filtered = filtered.filter(session =>
+              selectedClientIds.has(session.assignedUser) || // Session assigned user
+              session.shootingLists.some(list => selectedClientIds.has(list.userId)) // List assigned user
+          );
+      }
+    }
+
+    return filtered;
+  }, [allSessions, appliedFilters]); // Re-run filtering when allSessions or appliedFilters change
+
+  // Update sessionsToDisplay whenever filteredSessions changes
+  useEffect(() => {
+    setSessionsToDisplay(filterSessions);
+  }, [filterSessions]);
 
   // --- Handle Add Session ---
   const handleAddSession = async () => {
@@ -212,13 +348,12 @@ export default function DigitalAssetManagementPage() {
       setIsAlertDialogOpen(true);
       return;
     }
-    console.log(newSession);
     try {
       const response = await axios.post(
         `${API_BASE_URL}/admin/createsession`,
         {
           name: newSession.name.trim(),
-          assignedUser: newSession.user, // Ensure this matches your backend field name (userId or assignedUser)
+          assignedUser: newSession.user,
         },
         {
           headers: {
@@ -229,28 +364,10 @@ export default function DigitalAssetManagementPage() {
       );
 
       if (response.status === 201 || response.status === 200) {
-        const createdSession = response.data;
-
-        const assignedUserObj = fetchedUsers.find(
-          (user) => user._id === createdSession.assignedUser
-        );
-        const assignedUserName = assignedUserObj
-          ? assignedUserObj.name
-          : "Unknown User";
-
-        const newSessionEntry = {
-          _id: createdSession._id,
-          name: createdSession.name,
-          assignedUser: createdSession.assignedUser,
-          user: assignedUserName,
-          title: createdSession.name,
-          shootingLists: [], // Initially empty, will be populated on next fetchSessions
-        };
-
-        setSessions((prevSessions) => [...prevSessions, newSessionEntry]);
-
         setNewSession({ name: "", user: "" });
         setOpenSessionModal(false);
+        // Re-fetch ALL sessions after adding a new one
+        await fetchAllSessions();
 
         setAlertDialogContent({
           title: "Success",
@@ -275,7 +392,6 @@ export default function DigitalAssetManagementPage() {
   // --- Open Shooting List Modal ---
   const openShootingListModal = (sessionIndex) => {
     setShootingSessionIndex(sessionIndex);
-    // Reset form when opening
     setShootingListForm({
       name: "",
       sku: "",
@@ -285,7 +401,7 @@ export default function DigitalAssetManagementPage() {
       dimension: "",
       arrival: "",
       user: "",
-      images: [], // This is for local preview, actual images will be uploaded separately
+      images: [],
     });
     setOpenShootingModal(true);
   };
@@ -302,7 +418,6 @@ export default function DigitalAssetManagementPage() {
 
   // --- Handle Add Shooting List (API Call) ---
   const handleAddShootingList = async () => {
-    // Client-side validation
     if (
       !shootingListForm.name.trim() ||
       !shootingListForm.user ||
@@ -318,7 +433,7 @@ export default function DigitalAssetManagementPage() {
       return;
     }
 
-    const currentSessionId = sessions[shootingSessionIndex]?._id;
+    const currentSessionId = sessionsToDisplay[shootingSessionIndex]?._id; // Use sessionsToDisplay here
 
     if (!currentSessionId) {
       setAlertDialogContent({
@@ -333,7 +448,7 @@ export default function DigitalAssetManagementPage() {
 
     try {
       const payload = {
-        sessionId: currentSessionId, // From the currently selected session
+        sessionId: currentSessionId,
         name: shootingListForm.name.trim(),
         sku: shootingListForm.sku,
         barcode: shootingListForm.barcode,
@@ -341,13 +456,11 @@ export default function DigitalAssetManagementPage() {
         size: shootingListForm.size,
         dimension: shootingListForm.dimension,
         arrival: shootingListForm.arrival,
-        userId: shootingListForm.user, // Assuming your backend expects 'userId'
+        userId: shootingListForm.user,
       };
 
-      console.log("Sending shooting list payload:", payload); // For debugging
-
       const response = await axios.post(
-        `${API_BASE_URL}/admin/createlist`, // Your backend API endpoint for creating a shooting list
+        `${API_BASE_URL}/admin/createlist`,
         payload,
         {
           headers: {
@@ -358,15 +471,8 @@ export default function DigitalAssetManagementPage() {
       );
 
       if (response.status === 201 || response.status === 200) {
-        const newShootingList = response.data; // Assuming your API returns the created shooting list
-
-        // After successfully creating a new shooting list, re-fetch sessions
-        // to get the latest data including images for the new list.
-        await fetchSessions();
-
-        setOpenShootingModal(false); // Close the modal
+        setOpenShootingModal(false);
         setShootingListForm({
-          // Reset form after successful addition
           name: "",
           sku: "",
           barcode: "",
@@ -377,6 +483,8 @@ export default function DigitalAssetManagementPage() {
           user: "",
           images: [],
         });
+        // Re-fetch ALL sessions after adding a new list
+        await fetchAllSessions();
 
         setAlertDialogContent({
           title: "Success",
@@ -402,7 +510,6 @@ export default function DigitalAssetManagementPage() {
   const handleImageUpload = async () => {
     const { sessionIdx, listIdx } = imageModal;
 
-    // Check if any files are selected
     if (newImage.files.length === 0) {
       setAlertDialogContent({
         title: "Validation Error",
@@ -413,9 +520,8 @@ export default function DigitalAssetManagementPage() {
       return;
     }
 
-    const shootingListId = sessions[sessionIdx].shootingLists[listIdx]._id;
+    const shootingListId = sessionsToDisplay[sessionIdx].shootingLists[listIdx]._id; // Use sessionsToDisplay here
 
-    // Ensure we have a valid shootingListId
     if (!shootingListId) {
       setAlertDialogContent({
         title: "Error",
@@ -427,38 +533,34 @@ export default function DigitalAssetManagementPage() {
     }
 
     const formData = new FormData();
-    formData.append("listId", shootingListId); // Backend expects 'listId'
+    formData.append("listId", shootingListId);
 
-    // Append each selected file to the FormData under the 'files' key
     newImage.files.forEach((file) => {
-      formData.append("files", file); // Backend expects 'files' (plural)
+      formData.append("files", file);
     });
-    console.log("this is the image list", formData);
+
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/admin/upload`, // Assuming this is your images upload endpoint
+        `${API_BASE_URL}/admin/upload`,
         formData,
         {
           headers: {
             Authorization: `Bearer ${BEARER_TOKEN}`,
-            // Axios automatically sets 'Content-Type': 'multipart/form-data' for FormData
           },
         }
       );
 
-      // The backend controller returns an object with a 'data' array containing uploaded images.
       if (
         response.status === 201 ||
         (response.status === 200 &&
           response.data.data &&
           response.data.data.length > 0)
       ) {
-        // After successful image upload, re-fetch sessions to get the latest data.
-        await fetchSessions();
+        // Re-fetch ALL sessions after uploading images
+        await fetchAllSessions();
 
-        // Reset modal state
         setImageModal({ open: false, sessionIdx: null, listIdx: null });
-        setNewImage({ files: [] }); // Reset files array
+        setNewImage({ files: [] });
 
         setAlertDialogContent({
           title: "Success",
@@ -659,7 +761,6 @@ export default function DigitalAssetManagementPage() {
               onChange={handleShootingListImageUpload}
             />
             <div className="grid grid-cols-3 gap-2 pt-2">
-              {/* This section is primarily for local preview before actual list creation/image upload */}
               {shootingListForm.images.map((img, idx) => (
                 <img
                   key={idx}
@@ -677,44 +778,41 @@ export default function DigitalAssetManagementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Image with Metadata Modal (Simplified for multiple uploads) */}
+      {/* Add Image with Metadata Modal */}
       <Dialog
         open={imageModal.open}
         onOpenChange={(val) => setImageModal({ ...imageModal, open: val })}
       >
         <DialogContent className="space-y-4 max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Images</DialogTitle> {/* Changed title */}
+            <DialogTitle>Add Images</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="image-files">Image Files</Label>{" "}
-            {/* Changed label */}
+            <Label htmlFor="image-files">Image Files</Label>
             <Input
-              id="image-files" // Changed ID
+              id="image-files"
               type="file"
-              multiple // Allows multiple file selection
+              multiple
               accept="image/*"
-              onChange={
-                (e) =>
-                  setNewImage({
-                    ...newImage,
-                    files: Array.from(e.target.files),
-                  }) // Store all selected files
+              onChange={(e) =>
+                setNewImage({
+                  ...newImage,
+                  files: Array.from(e.target.files),
+                })
               }
             />
           </div>
 
           <div className="flex justify-end pt-4">
-            <Button onClick={handleImageUpload}>Upload</Button>{" "}
-            {/* Renamed function for clarity */}
+            <Button onClick={handleImageUpload}>Upload</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Sessions & Shooting Lists Display */}
-      {sessions.length > 0 ? (
-        sessions.map((session, sIdx) => (
+      {sessionsToDisplay.length > 0 ? ( // Use sessionsToDisplay for rendering
+        sessionsToDisplay.map((session, sIdx) => (
           <Card key={session._id || sIdx} className="mb-6 bg-white shadow-md">
             <CardContent className="p-4">
               <div className="flex justify-between items-center mb-2">
@@ -729,7 +827,6 @@ export default function DigitalAssetManagementPage() {
                 </Button>
               </div>
 
-              {/* Display "No shooting lists" if the array is empty */}
               {session.shootingLists.length === 0 ? (
                 <div className="py-4 text-center text-gray-500">
                   No shooting lists for this session yet.
@@ -737,7 +834,7 @@ export default function DigitalAssetManagementPage() {
               ) : (
                 session.shootingLists.map((list, lIdx) => (
                   <div
-                    key={list._id || lIdx} // Use list._id for a stable key if available
+                    key={list._id || lIdx}
                     className="border-t border-gray-300 pt-3 mb-4"
                   >
                     <div className="flex justify-between items-center mb-2">
@@ -751,12 +848,6 @@ export default function DigitalAssetManagementPage() {
                           Barcode: {list.barcode} | Dimension: {list.dimension}{" "}
                           | Status: {list.arrival}
                         </p>
-                        {/* <p className="text-sm text-gray-600">
-                          Assigned to:{" "}
-                          {fetchedUsers.find((u) => u._id === list.user)
-                            ?.name || "Unknown User"}{" "}
-                          (ID: {list.user})
-                        </p> */}
                       </div>
                       <Button
                         size="sm"
@@ -772,14 +863,12 @@ export default function DigitalAssetManagementPage() {
                       </Button>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {/* Render images fetched from the API */}
                       {list.images && list.images.length > 0 ? (
                         list.images.map((img, iIdx) => (
                           <div
-                            key={img._id || iIdx} // Use image._id for a stable key
+                            key={img._id || iIdx}
                             className="rounded-lg border p-2 bg-white"
                           >
-                            {/* Assuming img.imageURL contains the direct URL from Cloudinary */}
                             <img
                               src={img.imageURL}
                               alt={`Image ${iIdx}`}
@@ -806,6 +895,18 @@ export default function DigitalAssetManagementPage() {
           <p className="text-sm text-muted-foreground">
             Click "Add Session" to create a new session.
           </p>
+          {/* Display a message if no sessions due to filters */}
+          {Object.keys(appliedFilters).length > 0 &&
+            Object.values(appliedFilters).some(
+              (val) =>
+                (Array.isArray(val) && val.length > 0) ||
+                (typeof val === "string" && val.trim() !== "")
+            ) && (
+              <p className="text-sm text-muted-foreground mt-2">
+                (Try adjusting your filters, no sessions match the current
+                criteria.)
+              </p>
+            )}
         </div>
       )}
       {/* Custom Alert/Success Dialog */}
