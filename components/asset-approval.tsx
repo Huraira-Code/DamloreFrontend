@@ -52,6 +52,8 @@ import { Separator } from "@/components/ui/separator";
 // Import JSZip and file-saver
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+// Import xlsx
+import * as XLSX from "xlsx";
 
 // Sample product data
 const sampleProducts = [
@@ -849,6 +851,56 @@ export default function AssetApproval({ appliedFilters = {} }) {
     }
   };
 
+  // --- New function to handle Export Grid (Excel) ---
+  const handleExportGrid = () => {
+    console.log("abnjh")
+    const selectedImagesWithMetadata: any[] = [];
+
+    // Iterate through products and their images to find selected ones
+    products.forEach((product) => {
+      product.images.forEach((image) => {
+        if (selectedImages[image.id]) {
+          selectedImagesWithMetadata.push({
+            "Product Code": product.code,
+            "Farfetch ID": product.farfetchId,
+            Barcode: product.barcode,
+            Category: product.categories.join(", "),
+            Season: product.season,
+            "Merchandising Class": product.merchandisingClass,
+            Gender: product.gender,
+            "Asset Type (Product)": product.assetType.join(", "), // Product-level asset types
+            "Image ID": image.id,
+            "Image Type": image.type, // Specific image type
+            "Image URL": image.url,
+            "Product Status": product.status,
+            "Image Status": image.status || "N/A", // If image has its own status
+          });
+        }
+      });
+    });
+
+    if (selectedImagesWithMetadata.length === 0) {
+      alert("Please select images to export metadata.");
+      return;
+    }
+
+    // Create a worksheet
+    const ws = XLSX.utils.json_to_sheet(selectedImagesWithMetadata);
+
+    // Create a workbook and add the worksheet
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Image Metadata");
+
+    // Generate and download the Excel file
+    const excelFileName = `image_metadata_${new Date()
+      .toISOString()
+      .slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, excelFileName);
+
+    // Optionally, clear selected images after export
+    setSelectedImages({});
+  };
+
   return (
     <div className="flex flex-col">
       <div className="bg-white border-b sticky top-0 z-10">
@@ -1210,7 +1262,13 @@ export default function AssetApproval({ appliedFilters = {} }) {
               </DialogContent>
             </Dialog>
 
-            <Button variant="outline" size="sm" className="whitespace-nowrap">
+            {/* Changed onClick to call handleExportGrid */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="whitespace-nowrap"
+              onClick={handleExportGrid}
+            >
               <Grid className="mr-2 h-4 w-4" />
               Export Grid
             </Button>
