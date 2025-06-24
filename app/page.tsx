@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AssetApproval from "@/components/asset-approval";
 import Sidebar from "@/components/sidebar";
 import DigitalAssetManagementPage from "@/components/assets_Management";
 import UserManagement from "@/components/user_management";
+import { jwtDecode } from "jwt-decode";
+import Router from "next/router";
 
 export default function Home() {
   const [activePage, setActivePage] = useState("assetApproval"); // default page
@@ -25,6 +27,27 @@ export default function Home() {
 
   // This state will hold the filters that are actively applied for search
   const [appliedFilters, setAppliedFilters] = useState({});
+
+
+   useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+        window.location.href = "/login";
+      return;
+    }
+
+    try {
+      const decoded = jwtDecode(token);
+      console.log("Decoded token:", decoded);
+      if (decoded.role !== "admin") {
+        window.location.href = "/lggin";
+      }
+    } catch (err) {
+      console.error("Invalid token", err);
+        window.location.href = "/login";
+    }
+  }, []);
+
 
   // 2. Function to handle search from Sidebar
   const handleSearch = () => {
