@@ -85,11 +85,13 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
     onConfirm: () => {},
   });
 
-  const BEARER_TOKEN = localStorage.getItem("token")
+  const BEARER_TOKEN = localStorage.getItem("token");
   // --- Fetch Users Function ---
   const fetchUsersMortal = async () => {
     setIsUsersLoading(true);
     setUsersError(null);
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     try {
       const response = await axios.get(`${API_BASE_URL}/admin/users`, {
         headers: {
@@ -109,6 +111,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
   };
 
   const handleUpdateImageMetadata = async () => {
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     if (!selectedImage?._id) {
       setAlertDialogContent({
         title: "Error",
@@ -165,6 +169,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
 
   // --- Fetch ALL Sessions and their data (no filters applied here) ---
   const fetchAllSessions = async () => {
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     try {
       const response = await axios.get(`${API_BASE_URL}/admin/sessions`, {
         headers: {
@@ -431,6 +437,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
       return;
     }
     try {
+      const BEARER_TOKEN = localStorage.getItem("token");
+
       const response = await axios.post(
         `${API_BASE_URL}/admin/createsession`,
         {
@@ -586,6 +594,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
 
   // --- Handle Image Upload (API Call) ---
   const handleImageUpload = async () => {
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     const {
       sessionIdx,
       listIdx,

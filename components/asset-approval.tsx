@@ -58,8 +58,6 @@ import * as XLSX from "xlsx";
 import API_BASE_URL from "@/API_BASE_URL";
 
 // --- API Constants (Move these to environment variables in a real app) ---
-const BEARER_TOKEN = localStorage.getItem("token")
-  
 
 // --- Helper Functions (remain mostly the same) ---
 const getUniqueValues = (products, key) => {
@@ -208,6 +206,8 @@ export default function AssetApproval({ appliedFilters = {} }) {
 
   // --- Fetch Users Function ---
   const fetchUsers = async () => {
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     try {
       const response = await axios.get(`${API_BASE_URL}/admin/users`, {
         headers: {
@@ -226,6 +226,8 @@ export default function AssetApproval({ appliedFilters = {} }) {
   const fetchProducts = async () => {
     setIsLoading(true);
     setError(null);
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     try {
       if (fetchedUsers.length === 0) {
         await fetchUsers();
@@ -305,6 +307,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
 
   const handleSaveNotes = async () => {
     if (!viewImageDialog.imageId) return;
+    const BEARER_TOKEN = localStorage.getItem("token");
 
     try {
       const response = await axios.put(
@@ -559,6 +562,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
   // --- Function to handle approving an image (now with notes/comments) ---
   const handleApproveImage = async () => {
     if (!viewImageDialog.imageId) return;
+    const BEARER_TOKEN = localStorage.getItem("token");
 
     // Determine the next status based on current status for "Approve" button
     let nextStatus = "";
@@ -607,6 +611,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
   // --- Function to handle rejecting an image ---
   const handleRejectImage = async () => {
     if (!viewImageDialog.imageId) return;
+const BEARER_TOKEN = localStorage.getItem("token")
 
     try {
       const response = await axios.put(
@@ -1459,7 +1464,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
             </div>
           </div>
           {/* Notes and Comments Section */}
-       
+
           <div className="flex justify-between mt-4">
             {/* Approve Button */}
             {viewImageDialog.imageStatus.toUpperCase() === "SHOT" ||

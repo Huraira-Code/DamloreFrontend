@@ -8,37 +8,37 @@ export default function AllSessions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
-  const fetchSessions = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API_BASE_URL}/user/sessions`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      setSessions(response.data.shootingSession);
-    } catch (err) {
-      console.error(err);
-      setError(
-        err.response?.data?.msg ||
-          "Something went wrong while fetching sessions."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchSessions();
+    const fetchSessions = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`${API_BASE_URL}/user/sessions`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setSessions(response.data.shootingSession);
+      } catch (err) {
+        console.error(err);
+        setError(
+          err.response?.data?.msg ||
+            "Something went wrong while fetching sessions."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSessions(); // call it from inside useEffect
   }, []);
 
   const updateImageStatus = async (imageId, newStatus) => {
     try {
-      const token = await localStorage.getItem("token");
+      const token = localStorage.getItem("token");
       await axios.put(
         `${API_BASE_URL}/user/send/${imageId}`,
         { status: newStatus },

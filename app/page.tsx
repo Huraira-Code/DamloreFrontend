@@ -39,7 +39,7 @@ export default function Home() {
     try {
       const decoded = jwtDecode(token);
       console.log("Decoded token:", decoded);
-      if (decoded.role !== "admin") {
+      if (decoded?.role !== "admin") {
         window.location.href = "/lggin";
       }
     } catch (err) {

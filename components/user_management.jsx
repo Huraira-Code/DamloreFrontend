@@ -62,9 +62,10 @@ export default function UserManagement() {
 
   // Placeholder for your API endpoint and Bearer Token
   // IMPORTANT: In a real application, these should be handled securely (e.g., environment variables, secure authentication flow)
-  const BEARER_TOKEN = localStorage.getItem("token")
   // Function to fetch users from the API
   const fetchUsers = async () => {
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     setIsLoading(true);
     setError(null); // Clear previous errors
     try {
@@ -92,6 +93,8 @@ export default function UserManagement() {
 
   // Handles adding a new user
   const handleAddUser = async () => {
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     if (!newUsername.trim() || !newPassword.trim() || !newEmail.trim()) {
       setAlertDialogContent({
         title: "Validation Error",
@@ -151,6 +154,8 @@ export default function UserManagement() {
 
   // Handles deleting a user
   const handleDeleteUser = (userId) => {
+    const BEARER_TOKEN = localStorage.getItem("token");
+
     setConfirmDialogContent({
       title: "Confirm Deletion",
       description:
