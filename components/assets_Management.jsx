@@ -23,6 +23,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Info, XCircle, CheckCircle2 } from "lucide-react";
+import API_BASE_URL from "@/API_BASE_URL";
 
 export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
   // Store the full, unfiltered sessions data
@@ -33,6 +34,11 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
   const [openSessionModal, setOpenSessionModal] = useState(false);
   const [newSession, setNewSession] = useState({ name: "", user: "" });
 
+  const [openImageDetailModal, setOpenImageDetailModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null); // Will store the image object when clicked
+  const [isEditingMetadata, setIsEditingMetadata] = useState(false);
+  const [editedMetadata, setEditedMetadata] = useState({}); // To hold changes during edit
+
   const [openShootingModal, setOpenShootingModal] = useState(false);
   const [shootingSessionIndex, setShootingSessionIndex] = useState(null);
   const [shootingListForm, setShootingListForm] = useState({
@@ -40,8 +46,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
     sku: "",
     barcode: "",
     gender: "",
-    size: "",
-    dimension: "",
+    merchandisingclass: "",
+    assetypes: "",
     arrival: "",
     user: "",
     images: [],
@@ -51,6 +57,12 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
     open: false,
     sessionIdx: null,
     listIdx: null,
+    sku: "",
+    barcode: "",
+    gender: "",
+    merchandisingclass: "",
+    assetypes: "",
+    arrival: "",
   });
   const [newImage, setNewImage] = useState({
     files: [],
@@ -73,10 +85,7 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
     onConfirm: () => {},
   });
 
-  const API_BASE_URL = "https://damlorefinal.vercel.app";
-  const BEARER_TOKEN =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODQxMzNiZjA3MGVjMjY0NThlOTIxZjYiLCJlbWFpbCI6Imh1cmFpcmFzaGFoaWQwMDBAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzQ5MTAzNTk5LCJleHAiOjE3NTE2OTU1OTl9.ZvZr2jE2pEpxMnn4bYKdkqY1GoDmhts2zCecekHbbSA";
-
+  const BEARER_TOKEN = localStorage.getItem("token")
   // --- Fetch Users Function ---
   const fetchUsersMortal = async () => {
     setIsUsersLoading(true);
@@ -96,6 +105,61 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
       setFetchedUsers([]);
     } finally {
       setIsUsersLoading(false);
+    }
+  };
+
+  const handleUpdateImageMetadata = async () => {
+    if (!selectedImage?._id) {
+      setAlertDialogContent({
+        title: "Error",
+        description: "No image selected for update.",
+        type: "error",
+      });
+      setIsAlertDialogOpen(true);
+      return;
+    }
+
+    try {
+      const payload = {
+        assetType: editedMetadata.assetType,
+        merchandisingClass: editedMetadata.merchandisingClass,
+        sku: editedMetadata.sku, // Include SKU in payload
+        barcode: editedMetadata.barcode, // Include Barcode in payload
+        // Add any other fields you want to update that are on the image
+      };
+
+      const response = await axios.put(
+        `${API_BASE_URL}/admin/images/${selectedImage._id}`, // Assuming an API endpoint for updating image metadata
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${BEARER_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        setAlertDialogContent({
+          title: "Success",
+          description: "Image metadata updated successfully!",
+          type: "success",
+        });
+        setIsAlertDialogOpen(true);
+        setOpenImageDetailModal(false); // Close the modal
+        setIsEditingMetadata(false); // Exit edit mode
+        await fetchAllSessions(); // Re-fetch data to reflect changes
+      }
+    } catch (error) {
+      console.error("Failed to update image metadata:", error);
+      setAlertDialogContent({
+        title: "API Error",
+        description:
+          error.response?.data?.message ||
+          "Failed to update image metadata. Please try again.",
+        type: "error",
+      });
+      setIsAlertDialogOpen(true);
     }
   };
 
@@ -163,6 +227,7 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
         const fullyPopulatedSessions = await Promise.all(
           fetchedSessionsPromises
         );
+        console.log(fullyPopulatedSessions);
         // Store the full, unfiltered data
         setAllSessions(fullyPopulatedSessions);
       }
@@ -212,14 +277,14 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
         );
 
         if (targetSkus.size > 0) {
-          console.log("mukesh ambani")
-          console.log(filtered)
+          console.log("mukesh ambani");
+          console.log(filtered);
           filtered = filtered.filter((session) =>
             session.shootingLists.some((list) =>
               targetSkus.has(list.sku.toLowerCase())
             )
           );
-          console.log(filtered)
+          console.log(filtered);
         }
       }
 
@@ -245,33 +310,44 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
       }
 
       // Example: Filter by Farfetch ID (if you have it on your lists)
-      if (appliedFilters.farfetchIdFilter || appliedFilters.bulkFarfetchIdCodes) {
+      if (
+        appliedFilters.farfetchIdFilter ||
+        appliedFilters.bulkFarfetchIdCodes
+      ) {
         const targetFarfetchIds = new Set(
-          (appliedFilters.farfetchIdFilter ? [appliedFilters.farfetchIdFilter] : [])
+          (appliedFilters.farfetchIdFilter
+            ? [appliedFilters.farfetchIdFilter]
+            : []
+          )
             .concat(
               appliedFilters.bulkFarfetchIdCodes
-                ? appliedFilters.bulkFarfetchIdCodes.split(/\r?\n/).filter(Boolean)
+                ? appliedFilters.bulkFarfetchIdCodes
+                    .split(/\r?\n/)
+                    .filter(Boolean)
                 : []
             )
             .map((id) => id.toLowerCase())
         );
         if (targetFarfetchIds.size > 0) {
-            filtered = filtered.filter(session =>
-                session.shootingLists.some(list =>
-                    targetFarfetchIds.has((list.farfetchId || '').toLowerCase()) // Assuming lists might have farfetchId
-                )
-            );
+          filtered = filtered.filter((session) =>
+            session.shootingLists.some(
+              (list) =>
+                targetFarfetchIds.has((list.farfetchId || "").toLowerCase()) // Assuming lists might have farfetchId
+            )
+          );
         }
       }
 
       // Filter by Merchandising Classes (assuming lists have a merchandisingClass field)
       if (appliedFilters.selectedMerchandisingClasses?.length > 0) {
         const selectedClasses = new Set(
-          appliedFilters.selectedMerchandisingClasses.map((c) => c.toLowerCase())
+          appliedFilters.selectedMerchandisingClasses.map((c) =>
+            c.toLowerCase()
+          )
         );
         filtered = filtered.filter((session) =>
           session.shootingLists.some((list) =>
-            selectedClasses.has((list.merchandisingClass || '').toLowerCase())
+            selectedClasses.has((list.merchandisingClass || "").toLowerCase())
           )
         );
       }
@@ -282,8 +358,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
           appliedFilters.selectedSeasons.map((s) => s.toLowerCase())
         );
         filtered = filtered.filter((session) =>
-          session.shootingLists.some((list) =>
-            selectedSeasons.has((list.season || '').toLowerCase()) // Assuming lists might have season
+          session.shootingLists.some(
+            (list) => selectedSeasons.has((list.season || "").toLowerCase()) // Assuming lists might have season
           )
         );
       }
@@ -295,7 +371,7 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
         );
         filtered = filtered.filter((session) =>
           session.shootingLists.some((list) =>
-            selectedGenders.has((list.gender || '').toLowerCase())
+            selectedGenders.has((list.gender || "").toLowerCase())
           )
         );
       }
@@ -310,8 +386,9 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
         );
         filtered = filtered.filter((session) =>
           session.shootingLists.some((list) =>
-            list.images.some((image) =>
-              selectedAssetTypes.has((image.assetType || '').toLowerCase()) // Assuming image has an assetType
+            list.images.some(
+              (image) =>
+                selectedAssetTypes.has((image.assetType || "").toLowerCase()) // Assuming image has an assetType
             )
           )
         );
@@ -319,13 +396,18 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
 
       // Filter by Clients (users assigned to sessions or shooting lists)
       if (appliedFilters.selectedClients?.length > 0) {
-          const selectedClientIds = new Set(
-              appliedFilters.selectedClients.map(client => client._id).filter(Boolean)
-          );
-          filtered = filtered.filter(session =>
-              selectedClientIds.has(session.assignedUser) || // Session assigned user
-              session.shootingLists.some(list => selectedClientIds.has(list.userId)) // List assigned user
-          );
+        const selectedClientIds = new Set(
+          appliedFilters.selectedClients
+            .map((client) => client._id)
+            .filter(Boolean)
+        );
+        filtered = filtered.filter(
+          (session) =>
+            selectedClientIds.has(session.assignedUser) || // Session assigned user
+            session.shootingLists.some((list) =>
+              selectedClientIds.has(list.userId)
+            ) // List assigned user
+        );
       }
     }
 
@@ -397,8 +479,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
       sku: "",
       barcode: "",
       gender: "",
-      size: "",
-      dimension: "",
+      merchandisingclass: "",
+      assetypes: "",
       arrival: "",
       user: "",
       images: [],
@@ -418,11 +500,7 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
 
   // --- Handle Add Shooting List (API Call) ---
   const handleAddShootingList = async () => {
-    if (
-      !shootingListForm.name.trim() ||
-      !shootingListForm.user ||
-      !shootingListForm.arrival
-    ) {
+    if (!shootingListForm.name.trim() || !shootingListForm.user) {
       setAlertDialogContent({
         title: "Validation Error",
         description:
@@ -453,8 +531,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
         sku: shootingListForm.sku,
         barcode: shootingListForm.barcode,
         gender: shootingListForm.gender,
-        size: shootingListForm.size,
-        dimension: shootingListForm.dimension,
+        assetypes: shootingListForm.assetypes,
+        merchandisingclass: shootingListForm.merchandisingclass,
         arrival: shootingListForm.arrival,
         userId: shootingListForm.user,
       };
@@ -477,8 +555,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
           sku: "",
           barcode: "",
           gender: "",
-          size: "",
-          dimension: "",
+          assetypes: "",
+          merchandisingclass: "",
           arrival: "",
           user: "",
           images: [],
@@ -508,8 +586,16 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
 
   // --- Handle Image Upload (API Call) ---
   const handleImageUpload = async () => {
-    const { sessionIdx, listIdx } = imageModal;
-
+    const {
+      sessionIdx,
+      listIdx,
+      sku,
+      barcode,
+      gender,
+      assetypes,
+      merchandisingclass,
+      arrival,
+    } = imageModal; // Destructure the new properties
     if (newImage.files.length === 0) {
       setAlertDialogContent({
         title: "Validation Error",
@@ -520,7 +606,8 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
       return;
     }
 
-    const shootingListId = sessionsToDisplay[sessionIdx].shootingLists[listIdx]._id; // Use sessionsToDisplay here
+    const shootingListId =
+      sessionsToDisplay[sessionIdx].shootingLists[listIdx]._id; // Use sessionsToDisplay here
 
     if (!shootingListId) {
       setAlertDialogContent({
@@ -534,7 +621,13 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
 
     const formData = new FormData();
     formData.append("listId", shootingListId);
-
+    // Append the shooting list details to the form data
+    formData.append("sku", sku);
+    formData.append("barcode", barcode);
+    formData.append("gender", gender);
+    formData.append("merchandisingclass", merchandisingclass);
+    formData.append("assetypes", assetypes);
+    formData.append("arrival", arrival);
     newImage.files.forEach((file) => {
       formData.append("files", file);
     });
@@ -671,25 +764,63 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
             <DialogTitle>Add Shooting List</DialogTitle>
           </DialogHeader>
 
-          {["name", "sku", "barcode", "gender", "size", "dimension"].map(
-            (field) => (
-              <div key={field} className="space-y-2">
-                <Label htmlFor={`shooting-${field}`}>
-                  {field.charAt(0).toUpperCase() + field.slice(1)}
-                </Label>
-                <Input
-                  id={`shooting-${field}`}
-                  value={shootingListForm[field]}
-                  onChange={(e) =>
-                    setShootingListForm({
-                      ...shootingListForm,
-                      [field]: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            )
-          )}
+          {["name", "sku", "barcode", "gender"].map((field) => (
+            <div key={field} className="space-y-2">
+              <Label htmlFor={`shooting-${field}`}>
+                {field.charAt(0).toUpperCase() + field.slice(1)}
+              </Label>
+              <Input
+                id={`shooting-${field}`}
+                value={shootingListForm[field]}
+                onChange={(e) =>
+                  setShootingListForm({
+                    ...shootingListForm,
+                    [field]: e.target.value,
+                  })
+                }
+              />
+            </div>
+          ))}
+
+          <div className="space-y-2">
+            <Label htmlFor="arrival-status">Select Merchandising Class</Label>
+            <Select
+              onValueChange={(value) =>
+                setShootingListForm({
+                  ...shootingListForm,
+                  merchandisingclass: value,
+                })
+              }
+              value={shootingListForm.merchandisingclass}
+            >
+              <SelectTrigger id="arrival-status">
+                <SelectValue placeholder="Select Asset Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SOCKS">SOCKS</SelectItem>
+                <SelectItem value="SET UNDERWEAR">SET UNDERWEAR</SelectItem>
+                <SelectItem value="SCARF">SCARF</SelectItem>
+                <SelectItem value="SMALL LEATHER GOODS">
+                  SMALL LEATHER GOODS
+                </SelectItem>
+                <SelectItem value="SUNGLASSES">SUNGLASSES</SelectItem>
+                <SelectItem value="TIES">TIES</SelectItem>
+                <SelectItem value="TOWEL">TOWEL</SelectItem>
+                <SelectItem value="RTW (READY-TO-WEAR)">
+                  RTW (READY-TO-WEAR)
+                </SelectItem>
+                <SelectItem value="ACCESSORIES">ACCESSORIES</SelectItem>
+                <SelectItem value="GLOVES">GLOVES</SelectItem>
+                <SelectItem value="JEWELRY">JEWELRY</SelectItem>
+                <SelectItem value="KEY CHAINS">KEY CHAINS</SelectItem>
+                <SelectItem value="PAPILLONS">PAPILLONS</SelectItem>
+                <SelectItem value="RINGS">RINGS</SelectItem>
+                <SelectItem value="BAGS">BAGS</SelectItem>
+                <SelectItem value="BELTS">BELTS</SelectItem>
+                <SelectItem value="SHOES">SHOES</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="shooting-list-assign-user">Assign User</Label>
@@ -734,19 +865,21 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="arrival-status">Arrival Status</Label>
+            <Label htmlFor="arrival-status">Select Asset Type</Label>
             <Select
               onValueChange={(value) =>
-                setShootingListForm({ ...shootingListForm, arrival: value })
+                setShootingListForm({ ...shootingListForm, assetypes: value })
               }
-              value={shootingListForm.arrival}
+              value={shootingListForm.assetypes}
             >
               <SelectTrigger id="arrival-status">
-                <SelectValue placeholder="Select status" />
+                <SelectValue placeholder="Select Asset Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="arrival">Arrival</SelectItem>
-                <SelectItem value="non-arrival">Non-arrival</SelectItem>
+                <SelectItem value="On Model">On Model</SelectItem>
+                <SelectItem value="Ghost">Ghost</SelectItem>
+                <SelectItem value="Still Life">Still Life</SelectItem>
+                <SelectItem value="Video">Video</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -841,12 +974,12 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
                       <div>
                         <h3 className="text-lg font-medium">{list.name}</h3>
                         <p className="text-sm text-gray-600">
-                          SKU: {list.sku} | Gender: {list.gender} | Size:{" "}
-                          {list.size}
+                          SKU: {list.sku} | Gender: {list.gender} | Asset Type:{" "}
+                          {list?.assetypes}
                         </p>
                         <p className="text-sm text-gray-600">
-                          Barcode: {list.barcode} | Dimension: {list.dimension}{" "}
-                          | Status: {list.arrival}
+                          Barcode: {list.barcode} | Merchandising Class:{" "}
+                          {list.merchandisingclass} | Status: {list.arrival}
                         </p>
                       </div>
                       <Button
@@ -856,6 +989,12 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
                             open: true,
                             sessionIdx: sIdx,
                             listIdx: lIdx,
+                            sku: list.sku,
+                            barcode: list.barcode,
+                            gender: list.gender,
+                            merchandisingclass: list.merchandisingclass,
+                            assetypes: list.assetypes,
+                            arrival: list.arrival,
                           })
                         }
                       >
@@ -864,18 +1003,65 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                       {list.images && list.images.length > 0 ? (
-                        list.images.map((img, iIdx) => (
-                          <div
-                            key={img._id || iIdx}
-                            className="rounded-lg border p-2 bg-white"
-                          >
-                            <img
-                              src={img.imageURL}
-                              alt={`Image ${iIdx}`}
-                              className="rounded-lg w-full h-32 object-cover"
-                            />
-                          </div>
-                        ))
+                        list.images.map((img, iIdx) => {
+                          // Determine the background color class based on the image status
+                          let statusBgClass = "bg-gray-500"; // Default color if status is not matched
+                          switch (img.status) {
+                            case "SHOT":
+                              statusBgClass = "bg-red-600"; // Red for SHOT
+                              break;
+                            case "IN PROGRESS":
+                              statusBgClass = "bg-orange-500"; // Orange for IN PROGRESS
+                              break;
+                            case "APPROVED":
+                              statusBgClass = "bg-green-600"; // Green for APPROVED
+                              break;
+                            case "DELIVERED":
+                              statusBgClass = "bg-blue-600"; // Blue for DELIVERED
+                              break;
+                            default:
+                              statusBgClass = "bg-gray-500"; // Fallback for unknown status
+                          }
+
+                          return (
+                            <div
+                              key={img._id || iIdx}
+                              className="rounded-lg border p-2 bg-white cursor-pointer relative"
+                              onClick={() => {
+                                setSelectedImage(img);
+                                setEditedMetadata({
+                                  ...img,
+                                  assetType: img.assetType || "",
+                                  merchandisingClass:
+                                    img.merchandizingClass || "", // Fix: Check for typo if 'merchandizingClass' is used elsewhere
+                                });
+                                setIsEditingMetadata(false);
+                                setOpenImageDetailModal(true);
+                              }}
+                            >
+                              <img
+                                src={img.imageURL}
+                                alt={`Image ${iIdx}`}
+                                className="rounded-lg w-full h-32 object-cover"
+                              />
+
+                              {/* Image Status Tablet with Dynamic Color */}
+                              {img.status && ( // Only render if img.status exists
+                                <div
+                                  className={`
+              absolute top-2 right-2
+              ${statusBgClass} text-white
+              px-2 py-1 rounded-md
+              text-xs font-medium
+              shadow-md
+            `}
+                                >
+                                  {img.status}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
                       ) : (
                         <div className="col-span-full text-center text-gray-500 text-sm py-2">
                           No images for this list yet.
@@ -956,6 +1142,202 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
               Confirm
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openImageDetailModal}
+        onOpenChange={setOpenImageDetailModal}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Image Details</DialogTitle>
+            <DialogDescription>
+              View and edit metadata for this image.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedImage && (
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="md:w-1/2 flex justify-center items-center">
+                <img
+                  src={selectedImage.imageURL}
+                  alt="Selected Image"
+                  className="max-w-full max-h-[400px] object-contain rounded-lg shadow-md"
+                />
+              </div>
+
+              <div className="md:w-1/2 space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">
+                  Metadata
+                </h3>
+
+                {!isEditingMetadata ? (
+                  <div className="space-y-2">
+                    {/* Display Metadata */}
+                    <p>
+                      <strong>Image ID:</strong> {selectedImage._id}
+                    </p>
+                    <p>
+                      <strong>File Name:</strong> {selectedImage.fileName}
+                    </p>
+                    <p>
+                      <strong>Original Name:</strong>{" "}
+                      {selectedImage.originalName}
+                    </p>
+                    <p>
+                      <strong>Asset Type:</strong>{" "}
+                      {selectedImage.assetypes || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Merchandising Class:</strong>{" "}
+                      {selectedImage.merchandisingclass || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Uploaded At:</strong>{" "}
+                      {new Date(selectedImage.uploadedAt).toLocaleString()}
+                    </p>
+                    {/* Add any other metadata fields you have */}
+                    <p>
+                      <strong>SKU:</strong> {selectedImage.sku || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Barcode:</strong> {selectedImage.barcode || "N/A"}
+                    </p>
+                    {/* You'll need to fetch these from the parent shootingList if not directly on the image */}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Edit Metadata Form */}
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-asset-type">Asset Type</Label>
+                      <Select
+                        id="edit-asset-type"
+                        onValueChange={(value) =>
+                          setEditedMetadata({
+                            ...editedMetadata,
+                            assetType: value,
+                          })
+                        }
+                        value={editedMetadata.assetType || ""}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Asset Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="On Model">On Model</SelectItem>
+                          <SelectItem value="Ghost">Ghost</SelectItem>
+                          <SelectItem value="Still Life">Still Life</SelectItem>
+                          <SelectItem value="Video">Video</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-merchandising-class">
+                        Merchandising Class
+                      </Label>
+                      <Select
+                        id="edit-merchandising-class"
+                        onValueChange={(value) =>
+                          setEditedMetadata({
+                            ...editedMetadata,
+                            merchandisingClass: value,
+                          })
+                        }
+                        value={editedMetadata.merchandisingClass || ""}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Merchandising Class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SOCKS">SOCKS</SelectItem>
+                          <SelectItem value="SET UNDERWEAR">
+                            SET UNDERWEAR
+                          </SelectItem>
+                          <SelectItem value="SCARF">SCARF</SelectItem>
+                          <SelectItem value="SMALL LEATHER GOODS">
+                            SMALL LEATHER GOODS
+                          </SelectItem>
+                          <SelectItem value="SUNGLASSES">SUNGLASSES</SelectItem>
+                          <SelectItem value="TIES">TIES</SelectItem>
+                          <SelectItem value="TOWEL">TOWEL</SelectItem>
+                          <SelectItem value="RTW (READY-TO-WEAR)">
+                            RTW (READY-TO-WEAR)
+                          </SelectItem>
+                          <SelectItem value="ACCESSORIES">
+                            ACCESSORIES
+                          </SelectItem>
+                          <SelectItem value="GLOVES">GLOVES</SelectItem>
+                          <SelectItem value="JEWELRY">JEWELRY</SelectItem>
+                          <SelectItem value="KEY CHAINS">KEY CHAINS</SelectItem>
+                          <SelectItem value="PAPILLONS">PAPILLONS</SelectItem>
+                          <SelectItem value="RINGS">RINGS</SelectItem>
+                          <SelectItem value="BAGS">BAGS</SelectItem>
+                          <SelectItem value="BELTS">BELTS</SelectItem>
+                          <SelectItem value="SHOES">SHOES</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* --- NEW: SKU Input --- */}
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-sku">SKU</Label>
+                      <Input
+                        id="edit-sku"
+                        value={editedMetadata.sku || ""}
+                        onChange={(e) =>
+                          setEditedMetadata({
+                            ...editedMetadata,
+                            sku: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    {/* --- NEW: Barcode Input --- */}
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-barcode">Barcode</Label>
+                      <Input
+                        id="edit-barcode"
+                        value={editedMetadata.barcode || ""}
+                        onChange={(e) =>
+                          setEditedMetadata({
+                            ...editedMetadata,
+                            barcode: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    {/* Add other editable fields here (e.g., Input for custom tags) */}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 mt-4">
+                  {!isEditingMetadata ? (
+                    <Button onClick={() => setIsEditingMetadata(true)}>
+                      Edit Metadata
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditingMetadata(false);
+                          setEditedMetadata(selectedImage); // Revert changes
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleUpdateImageMetadata}>
+                        Save Changes
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </main>

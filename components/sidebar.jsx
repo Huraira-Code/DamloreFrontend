@@ -40,6 +40,7 @@ import {
 
 import { UserManagement } from "@/components/user_management"; // Assuming this is correct
 import axios from "axios";
+import API_BASE_URL from "@/API_BASE_URL";
 
 // Destructure all the props passed from Home
 export default function Sidebar({
@@ -152,12 +153,19 @@ export default function Sidebar({
       }
     });
   };
-  // Function to clear all filters
 
+  const handleLogout = () => {
+    // Remove the token from local storage
+    localStorage.removeItem("token");
+
+    // Optional: redirect to login or home page
+    window.location.href = "/login"; // or use your router
+  };
+
+  // Function to clear all filters
   const baseClasses = "flex items-center gap-3 px-3 py-2 text-sm rounded-md";
   const activeClasses = "bg-blue-50 text-blue-600";
   const inactiveClasses = "hover:bg-slate-100 text-slate-500";
-  const API_BASE_URL = "https://damlorefinal.vercel.app";
   const BEARER_TOKEN =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODQxMzNiZjA3MGVjMjY0NThlOTIxZjYiLCJlbWFpbCI6Imh1cmFpcmFzaGFoaWQwMDBAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzQ5MTAzNTk5LCJleHAiOjE3NTE2OTU1OTl9.ZvZr2jE2pEpxMnn4bYKdkqY1GoDmhts2zCecekHbbSA";
 
@@ -193,7 +201,7 @@ export default function Sidebar({
       </div>
 
       <nav className="flex-1 ">
-        <Link
+        {/* <Link
           href="#"
           onClick={() => setActivePage("dashboard")}
           className={`${baseClasses} ${
@@ -202,7 +210,7 @@ export default function Sidebar({
         >
           <LayoutGrid className="h-5 w-5" />
           <span>Dashboard</span>
-        </Link>
+        </Link> */}
 
         <Link
           href="#"
@@ -240,13 +248,13 @@ export default function Sidebar({
 
         <Link
           href="#"
-          onClick={() => setActivePage("settings")}
+          onClick={() => handleLogout()}
           className={`${baseClasses} ${
             activePage === "settings" ? activeClasses : inactiveClasses
           }`}
         >
           <Settings className="h-5 w-5" />
-          <span>Settings</span>
+          <span>Logout</span>
         </Link>
       </nav>
 

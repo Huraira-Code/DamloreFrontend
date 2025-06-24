@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react"; // Import useMemo
+import { useState, useEffect, useMemo } from "react";
+import axios from "axios";
 import {
   Search,
   Filter,
@@ -54,207 +55,15 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 // Import xlsx
 import * as XLSX from "xlsx";
+import API_BASE_URL from "@/API_BASE_URL";
 
-// Sample product data
-const sampleProducts = [
-  {
-    id: "S74AM1580S30341470",
-    code: "S74AM1580S30341470",
-    farfetchId: "FF12345",
-    barcode: "8057189123456",
-    categories: ["DENIM", "JACKETS"],
-    season: "SS24",
-    merchandisingClass: "RTW (READY-TO-WEAR)",
-    gender: "Men",
-    assetType: ["On Model", "Ghost"],
-    status: "Raw",
-    images: [
-      {
-        id: "S74AM1580S30341470T",
-        status: "",
-        url: "/images/S74AM1580S30341470T.jpg",
-        type: "On Model",
-      },
-      {
-        id: "S74AM1580S30341470M",
-        status: "",
-        url: "/images/S74AM1580S30341470M.jpg",
-        type: "On Model",
-      },
-      {
-        id: "S74AM1580S30341470B",
-        status: "",
-        url: "/images/S74AM1580S30341470B.jpg",
-        type: "On Model",
-      },
-      {
-        id: "S74AM1580S30341470S",
-        status: "",
-        url: "/images/S74AM1580S30341470S.jpg",
-        type: "On Model",
-      },
-      {
-        id: "S74AM1580S30341470G1",
-        status: "",
-        url: "/images/S74AM1580S30341470G1.jpg",
-        type: "Ghost",
-      },
-      {
-        id: "S74AM1580S30341470G2",
-        status: "",
-        url: "/images/S74AM1580S30341470G2.jpg",
-        type: "Ghost",
-      },
-    ],
-  },
-  {
-    id: "80119MCGV01",
-    code: "80119MCGV01",
-    farfetchId: "FF54321",
-    barcode: "8057189654321",
-    categories: ["SHOES", "ACCESSORIES"],
-    season: "SS24",
-    merchandisingClass: "JEWELRY",
-    gender: "Women",
-    assetType: ["On Model", "Still Life"],
-    status: "In Progress",
-    images: [
-      {
-        id: "img6",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "On Model",
-      },
-      {
-        id: "img7",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Still Life",
-      },
-      {
-        id: "img8",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "On Model",
-      },
-      {
-        id: "img8a",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Still Life",
-      },
-      {
-        id: "img8b",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "On Model",
-      },
-    ],
-  },
-  {
-    id: "80133MNGV01",
-    code: "80133MNGV01",
-    farfetchId: "FF67890",
-    barcode: "8057189678901",
-    categories: ["DRESSES", "TOPS"],
-    season: "FW24",
-    merchandisingClass: "RTW (READY-TO-WEAR)",
-    gender: "Women",
-    assetType: ["On Model", "Ghost"],
-    status: "Approved",
-    images: [
-      {
-        id: "img9",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "On Model",
-      },
-      {
-        id: "img10",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Ghost",
-      },
-      {
-        id: "img10a",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "On Model",
-      },
-      {
-        id: "img10b",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Ghost",
-      },
-      {
-        id: "img10c",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "On Model",
-      },
-      {
-        id: "img10d",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Ghost",
-      },
-    ],
-  },
-  {
-    id: "80173MGV02",
-    code: "80173MGV02",
-    farfetchId: "FF13579",
-    barcode: "8057189135790",
-    categories: ["PANTS", "JEANS"],
-    season: "SS25",
-    merchandisingClass: "BAGS",
-    gender: "Unisex",
-    assetType: ["Ghost", "Still Life"],
-    status: "Delivered",
-    images: [
-      {
-        id: "img11",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Ghost",
-      },
-      {
-        id: "img12",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Still Life",
-      },
-      {
-        id: "img13",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Ghost",
-      },
-      {
-        id: "img13a",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Still Life",
-      },
-      {
-        id: "img13b",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Ghost",
-      },
-      {
-        id: "img13c",
-        status: "",
-        url: "/placeholder.svg?height=200&width=200",
-        type: "Still Life",
-      },
-    ],
-  },
-];
+// --- API Constants (Move these to environment variables in a real app) ---
+const BEARER_TOKEN = localStorage.getItem("token")
+  
 
-// Get unique values for filters
+// --- Helper Functions (remain mostly the same) ---
 const getUniqueValues = (products, key) => {
+  console.log("status", products);
   if (key === "categories" || key === "assetType") {
     const allValues = products.flatMap((product) => product[key]);
     return [...new Set(allValues)];
@@ -262,28 +71,29 @@ const getUniqueValues = (products, key) => {
   return [...new Set(products.map((product) => product[key]))];
 };
 
-// Status counts
 const getStatusCounts = (products) => {
   const counts = {
     total: products.length,
-    Raw: 0,
-    "In Progress": 0,
-    Approved: 0,
-    Delivered: 0,
+    SHOT: 0,
+    "IN PROGRESS": 0,
+    APPROVED: 0,
+    DELIVERED: 0,
   };
 
   products.forEach((product) => {
-    const status = product.status;
-    counts[status] = (counts[status] || 0) + 1;
+    product.images.forEach((e) => {
+      console.log("me2", e);
+      const status = e.status;
+      console.log("this is sattus", product.status);
+      counts[status] = (counts[status] || 0) + 1;
+    });
   });
-
+  console.log("jio2", counts);
   return counts;
 };
 
-// Asset types (these can remain static if they don't change based on data)
 const assetTypes = ["On Model", "Ghost", "Still Life", "Video"];
 
-// Merchandising classes (these can remain static if they don't change based on data)
 const merchandisingClasses = [
   "SOCKS",
   "SET UNDERWEAR",
@@ -304,28 +114,33 @@ const merchandisingClasses = [
   "SHOES",
 ];
 
-// Receive appliedFilters as a prop
 export default function AssetApproval({ appliedFilters = {} }) {
-  // `products` now holds the original, unfiltered sample data
-  const [products, setProducts] = useState(sampleProducts);
-  // `filteredProducts` will be the result of applying all filters (local + global)
-  const [filteredProducts, setFilteredProducts] = useState(sampleProducts);
+  // --- New State for Data Fetching ---
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [fetchedUsers, setFetchedUsers] = useState([]);
+  // --- Existing States ---
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedImages, setSelectedImages] = useState<{
     [key: string]: boolean;
   }>({});
-  const [searchTerm, setSearchTerm] = useState(""); // Local search term input
+  const [searchTerm, setSearchTerm] = useState("");
   const [bulkCodesDialogOpen, setBulkCodesDialogOpen] = useState(false);
-  const [bulkCodes, setBulkCodes] = useState(""); // Local bulk codes input
+  const [bulkCodes, setBulkCodes] = useState("");
   const [currentTab, setCurrentTab] = useState("All");
   const [viewImageDialog, setViewImageDialog] = useState({
     open: false,
     url: "",
     product: null,
     imageType: "",
+    imageStatus: "",
+    imageId: "",
+    notes: "", // Added notes to the dialog state
+    comments: "", // Added comments to the dialog state
   });
-  const [statusCounts, setStatusCounts] = useState(getStatusCounts(products));
+  const [statusCounts, setStatusCounts] = useState(getStatusCounts([]));
   const [exportFormatDialog, setExportFormatDialog] = useState(false);
-
   const [exportDestination, setExportDestination] = useState("");
   const [exportPlatform, setExportPlatform] = useState("");
   const [exportFormat, setExportFormat] = useState("zip");
@@ -334,8 +149,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
   const [customHeight, setCustomHeight] = useState("1200");
   const [includeMetadata, setIncludeMetadata] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-
-  // Local filter states (Dropdown filters)
   const [activeFilters, setActiveFilters] = useState<{
     season: string[];
     merchandisingClass: string[];
@@ -348,193 +161,238 @@ export default function AssetApproval({ appliedFilters = {} }) {
     assetType: [],
   });
 
-  // Get unique values for filters from the *original* products list
-  const uniqueSeasons = getUniqueValues(products, "season");
-  const uniqueGenders = getUniqueValues(products, "gender");
+  // --- Transformation Function from Sessions to Products ---
+  const transformSessionsToProducts = (sessions, users) => {
+    console.log(sessions);
+    const productsTransformed = [];
 
-  // This useEffect updates status counts whenever the `products` state changes
+    sessions.forEach((session) => {
+      session.shootingLists.forEach((list) => {
+        const assignedUserObj = users.find((user) => user._id === list.userId);
+        const assignedUserName = assignedUserObj
+          ? assignedUserObj.name
+          : "Unknown User";
+
+        const transformedProduct = {
+          id: list._id,
+          code: list.sku || list.name,
+          shootingName: list.name,
+          farfetchId: list.farfetchId || "",
+          barcode: list.barcode,
+          categories: [],
+          season: session?.name || "",
+          merchandisingClass: list.merchandisingclass,
+          gender: list.gender,
+          assetType: list.assetypes ? [list.assetypes] : [],
+          status: list.arrival,
+          assignedUser: assignedUserName,
+          images: list.images.map((img) => ({
+            id: img._id,
+            status: img.status || "",
+            url: img.imageURL,
+            type: img.assetType || img.assetypes || "Unknown",
+            sku: img.sku || list.sku,
+            barcode: img.barcode || list.barcode,
+            merchandisingClass:
+              img.merchandisingClass || list.merchandisingclass,
+            assetType: img.assetType || list.assetypes,
+            notes: img.notes || "", // Added notes from image data
+            comments: img.comments || "", // Added comments from image data
+          })),
+        };
+        productsTransformed.push(transformedProduct);
+      });
+    });
+    return productsTransformed;
+  };
+
+  // --- Fetch Users Function ---
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/admin/users`, {
+        headers: {
+          Authorization: `Bearer ${BEARER_TOKEN}`,
+        },
+      });
+      setFetchedUsers(response.data.users || []);
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+      setError("Failed to load users. Please check your network or API token.");
+      setFetchedUsers([]);
+    }
+  };
+
+  // --- Fetch Products Data ---
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (fetchedUsers.length === 0) {
+        await fetchUsers();
+      }
+
+      const sessionsResponse = await axios.get(
+        `${API_BASE_URL}/admin/sessions`,
+        {
+          headers: {
+            Authorization: `Bearer ${BEARER_TOKEN}`,
+          },
+        }
+      );
+
+      if (sessionsResponse.status === 200) {
+        const fetchedSessionsPromises =
+          sessionsResponse.data.shootingSessions.map(async (session) => {
+            const shootingListsFromSession =
+              session.shootingListIDs && Array.isArray(session.shootingListIDs)
+                ? session.shootingListIDs.filter((list) => list && list._id)
+                : [];
+
+            const shootingListsWithFetchedImagesPromises =
+              shootingListsFromSession.map(async (list) => {
+                try {
+                  const imagesResponse = await axios.get(
+                    `${API_BASE_URL}/admin/images/${list._id}`,
+                    {
+                      headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
+                    }
+                  );
+                  return {
+                    ...list,
+                    images: imagesResponse.data.imagesData || [],
+                  };
+                } catch (imageError) {
+                  console.error(
+                    `Failed to fetch images for shooting list ID ${list._id}:`,
+                    imageError.response?.data?.msg || imageError.message
+                  );
+                  return { ...list, images: [] };
+                }
+              });
+
+            const shootingListsWithFetchedImages = await Promise.all(
+              shootingListsWithFetchedImagesPromises
+            );
+
+            return {
+              _id: session._id,
+              name: session.name,
+              assignedUser: session.assignedUser,
+              shootingLists: shootingListsWithFetchedImages,
+            };
+          });
+
+        const fullyPopulatedSessions = await Promise.all(
+          fetchedSessionsPromises
+        );
+        const transformedData = transformSessionsToProducts(
+          fullyPopulatedSessions,
+          fetchedUsers
+        );
+        setProducts(transformedData);
+        setStatusCounts(getStatusCounts(transformedData));
+      }
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
+      setError(
+        "Failed to load products. Please check your network or API token."
+      );
+      setProducts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!viewImageDialog.imageId) return;
+
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/admin/send/${viewImageDialog.imageId}`,
+        {
+          notes: viewImageDialog.notes,
+          comments: viewImageDialog.comments,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${BEARER_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("Response from saving notes:", response);
+      if (response.status === 200) {
+        alert("Notes and comments saved successfully!");
+
+        // *** FIX START ***
+        // Optimistically update the viewImageDialog state with the new notes/comments
+        // This assumes your backend returns the updated imageData in the response,
+        // which is good practice. If not, you might need to find the specific
+        // image in your 'products' state and update it there, or re-fetch all products.
+        setViewImageDialog((prevDialog) => ({
+          ...prevDialog,
+          // Update with the values that were just successfully saved
+          notes: prevDialog.notes,
+          comments: prevDialog.comments,
+          // If your backend returns the updated image data, you can use:
+          // notes: response.data.imageData.notes || "",
+          // comments: response.data.imageData.comments || "",
+        }));
+
+        // Re-fetch products to ensure overall data consistency across the app,
+        // especially if notes/comments are also displayed in ProductRow.
+        fetchProducts();
+        // *** FIX END ***
+      } else {
+        alert(`Failed to save notes: ${response.data.msg}`);
+      }
+    } catch (error) {
+      console.error("Error saving notes:", error);
+      alert("Error saving notes. Please try again.");
+    }
+  };
+
+  // --- Initial Data Load on Mount ---
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    if (fetchedUsers.length > 0) {
+      fetchProducts();
+    }
+  }, [fetchedUsers]);
+
   useEffect(() => {
     setStatusCounts(getStatusCounts(products));
   }, [products]);
 
-  // Main filtering logic using useMemo
+  const uniqueSeasons = getUniqueValues(products, "season");
+  const uniqueGenders = getUniqueValues(products, "gender");
+
   const productsToDisplay = useMemo(() => {
-    let result = [...products]; // Start with all original products
+    let result = [...products];
 
-    // --- Apply Global Filters from `appliedFilters` prop ---
-
-    // Apply SKU, Barcode, Farfetch ID filter (individual or bulk)
-    const globalSkuFilter = appliedFilters.skuFilter?.toLowerCase() || "";
-    const globalBarcodeFilter =
-      appliedFilters.barcodeFilter?.toLowerCase() || "";
-    const globalFarfetchIdFilter =
-      appliedFilters.farfetchIdFilter?.toLowerCase() || "";
-
-    const globalBulkSkuCodes =
-      appliedFilters.bulkSkuCodes
-        ?.split(/\r?\n/)
-        .map((s) => s.toLowerCase())
-        .filter(Boolean) || [];
-    const globalBulkBarcodeCodes =
-      appliedFilters.bulkBarcodeCodes
-        ?.split(/\r?\n/)
-        .map((b) => b.toLowerCase())
-        .filter(Boolean) || [];
-    const globalBulkFarfetchIdCodes =
-      appliedFilters.bulkFarfetchIdCodes
-        ?.split(/\r?\n/)
-        .map((id) => id.toLowerCase())
-        .filter(Boolean) || [];
-
-    if (
-      globalSkuFilter ||
-      globalBarcodeFilter ||
-      globalFarfetchIdFilter ||
-      globalBulkSkuCodes.length > 0 ||
-      globalBulkBarcodeCodes.length > 0 ||
-      globalBulkFarfetchIdCodes.length > 0
-    ) {
-      result = result.filter((product) => {
-        const productCodeLower = product.code.toLowerCase();
-        const productBarcodeLower = product.barcode.toLowerCase();
-        const productFarfetchIdLower = product.farfetchId?.toLowerCase() || "";
-
-        // Check individual search terms
-        if (globalSkuFilter && productCodeLower.includes(globalSkuFilter))
-          return true;
-        if (
-          globalBarcodeFilter &&
-          productBarcodeLower.includes(globalBarcodeFilter)
-        )
-          return true;
-        if (
-          globalFarfetchIdFilter &&
-          productFarfetchIdLower.includes(globalFarfetchIdFilter)
-        )
-          return true;
-
-        // Check against bulk codes
-        if (
-          globalBulkSkuCodes.length > 0 &&
-          globalBulkSkuCodes.some((code) => productCodeLower.includes(code))
-        )
-          return true;
-        if (
-          globalBulkBarcodeCodes.length > 0 &&
-          globalBulkBarcodeCodes.some((code) =>
-            productBarcodeLower.includes(code)
-          )
-        )
-          return true;
-        if (
-          globalBulkFarfetchIdCodes.length > 0 &&
-          globalBulkFarfetchIdCodes.some((id) =>
-            productFarfetchIdLower.includes(id)
-          )
-        )
-          return true;
-
-        return false;
-      });
-    }
-
-    // Apply global Merchandising Class filters
     if (appliedFilters.selectedMerchandisingClasses?.length > 0) {
       const globalSelectedClasses = new Set(
         appliedFilters.selectedMerchandisingClasses.map((c) => c.toLowerCase())
       );
       result = result.filter((product) =>
-        globalSelectedClasses.has(product.merchandisingClass.toLowerCase())
+        globalSelectedClasses.has(
+          (product.merchandisingClass || "").toLowerCase()
+        )
       );
     }
 
-    // Apply global Season filters
-    if (appliedFilters.selectedSeasons?.length > 0) {
-      const globalSelectedSeasons = new Set(
-        appliedFilters.selectedSeasons.map((s) => s.toLowerCase())
-      );
-      result = result.filter((product) =>
-        globalSelectedSeasons.has(product.season.toLowerCase())
-      );
-    }
-
-    // Apply global Gender filters
-    if (appliedFilters.selectedGenders?.length > 0) {
-      const globalSelectedGenders = new Set(
-        appliedFilters.selectedGenders.map((g) => g.toLowerCase())
-      );
-      result = result.filter((product) =>
-        globalSelectedGenders.has(product.gender.toLowerCase())
-      );
-    }
-
-    // Apply global Asset Type filters
     if (appliedFilters.selectedAssetTypes?.length > 0) {
       const globalSelectedAssetTypes = new Set(
         appliedFilters.selectedAssetTypes.map((at) => at.toLowerCase())
       );
       result = result.filter((product) =>
         product.assetType.some((type) =>
-          globalSelectedAssetTypes.has(type.toLowerCase())
+          globalSelectedAssetTypes.has((type || "").toLowerCase())
         )
-      );
-    }
-
-    // Apply global Clients filter (This is a bit tricky with your current sample data structure
-    // as products don't seem to have a 'client' or 'assignedUser' property directly.
-    // If your `product` objects had a `clientId` or `assignedUserId` property,
-    // you would filter based on `appliedFilters.selectedClients.map(client => client._id)`.
-    // For now, I'll omit a direct client filter on `sampleProducts` as it's not directly supported.
-    // If your actual `products` data has this, you'd add:
-    /*
-    if (appliedFilters.selectedClients?.length > 0) {
-        const globalSelectedClientIds = new Set(appliedFilters.selectedClients.map(client => client._id).filter(Boolean));
-        result = result.filter(product => globalSelectedClientIds.has(product.assignedClientId)); // Assuming product has assignedClientId
-    }
-    */
-
-    // --- Apply Local Filters (from AssetApproval's own UI elements) ---
-
-    // Apply status filter (tabs)
-    if (currentTab !== "All") {
-      result = result.filter((product) => product.status === currentTab);
-    }
-
-    // Apply local search term
-    if (searchTerm) {
-      // Check if it's a multi-code search (separated by |)
-      if (searchTerm.includes("|")) {
-        const codes = searchTerm
-          .split("|")
-          .map((code) => code.trim().toLowerCase());
-        result = result.filter((product) =>
-          codes.some(
-            (code) =>
-              product.code.toLowerCase().includes(code) ||
-              (product.farfetchId &&
-                product.farfetchId.toLowerCase().includes(code)) || // Ensure farfetchId exists
-              (product.barcode && product.barcode.toLowerCase().includes(code)) // Ensure barcode exists
-          )
-        );
-      } else {
-        // Regular search
-        result = result.filter(
-          (product) =>
-            product.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (product.farfetchId &&
-              product.farfetchId
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase())) ||
-            (product.barcode &&
-              product.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-      }
-    }
-
-    // Apply local dropdown filters
-    if (activeFilters.season.length > 0) {
-      result = result.filter((product) =>
-        activeFilters.season.includes(product.season)
       );
     }
 
@@ -544,30 +402,50 @@ export default function AssetApproval({ appliedFilters = {} }) {
       );
     }
 
-    if (activeFilters.gender.length > 0) {
-      result = result.filter((product) =>
-        activeFilters.gender.includes(product.gender)
-      );
-    }
-
     if (activeFilters.assetType.length > 0) {
       result = result.filter((product) =>
         product.assetType.some((type) => activeFilters.assetType.includes(type))
       );
     }
+    if (activeFilters.gender.length > 0) {
+      result = result.filter((product) => {
+        const productGenders = Array.isArray(product.gender)
+          ? product.gender.map((g) => g.toLowerCase())
+          : [(product.gender || "").toLowerCase()];
 
-    // Sort by code (always apply sorting at the end)
+        const filterGenders = activeFilters.gender.map((g) => g.toLowerCase());
+
+        return filterGenders.some((filterGender) =>
+          productGenders.includes(filterGender)
+        );
+      });
+    }
+
+    if (activeFilters.season.length > 0) {
+      result = result.filter((product) =>
+        activeFilters.season.includes(product.season)
+      );
+    }
+
+    console.log("merasas", result);
+    if (currentTab !== "All") {
+      console.log("moka 2", currentTab);
+      result = result.filter((product) =>
+        product.images.some(
+          (image) => image.status.toLowerCase() === currentTab.toLowerCase()
+        )
+      );
+    }
+
     result = [...result].sort((a, b) => a.code.localeCompare(b.code));
 
     return result;
-  }, [products, currentTab, searchTerm, activeFilters, appliedFilters]); // Re-run when these dependencies change
+  }, [products, currentTab, searchTerm, activeFilters, appliedFilters]);
 
-  // Update filteredProducts whenever productsToDisplay changes
   useEffect(() => {
     setFilteredProducts(productsToDisplay);
   }, [productsToDisplay]);
 
-  // Handle bulk code import (still uses local searchTerm)
   const handleBulkCodeImport = () => {
     if (!bulkCodes.trim()) return;
 
@@ -577,22 +455,19 @@ export default function AssetApproval({ appliedFilters = {} }) {
       .filter((code) => code.length > 0);
 
     if (codeList.length > 0) {
-      // Update local search term with bulk codes
       setSearchTerm(codeList.join("|"));
     }
 
     setBulkCodesDialogOpen(false);
   };
 
-  // Toggle image selection
   const toggleImageSelection = (imageId: string) => {
     setSelectedImages((prev) => ({
-      ...prev,
+      ...prev, // Ensure previous state is spread correctly
       [imageId]: !prev[imageId],
     }));
   };
 
-  // Select all images for a product
   const selectAllImages = (productId: string) => {
     const product = products.find((p) => p.id === productId);
     if (!product) return;
@@ -608,12 +483,37 @@ export default function AssetApproval({ appliedFilters = {} }) {
     setSelectedImages(newSelectedImages);
   };
 
-  // View image
-  const viewImage = (url: string, product: any, imageType: string) => {
-    setViewImageDialog({ open: true, url, product, imageType });
+  // Modified viewImage to include notes and comments from the image object
+  const viewImage = (
+    url: string,
+    product: any,
+    imageType: string,
+    imageStatus: string,
+    imageId: string,
+    notes: string = "",
+    comments: string = ""
+  ) => {
+    console.log("Viewing image:", {
+      url,
+      product,
+      imageType,
+      imageStatus,
+      imageId,
+      notes,
+      comments,
+    });
+    setViewImageDialog({
+      open: true,
+      url,
+      product,
+      imageType,
+      imageStatus,
+      imageId,
+      notes, // Set existing notes
+      comments, // Set existing comments
+    });
   };
 
-  // Toggle local dropdown filter
   const toggleFilter = (
     filterType: "season" | "merchandisingClass" | "gender" | "assetType",
     value: string
@@ -635,7 +535,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
     });
   };
 
-  // Clear all filters (local only)
   const clearAllFilters = () => {
     setActiveFilters({
       season: [],
@@ -645,10 +544,8 @@ export default function AssetApproval({ appliedFilters = {} }) {
     });
     setSearchTerm("");
     setCurrentTab("All");
-    // Note: This only clears local filters. Global filters (appliedFilters) come from Home and are not cleared here.
   };
 
-  // Count active filters (local only)
   const activeLocalFilterCount =
     activeFilters.season.length +
     activeFilters.merchandisingClass.length +
@@ -657,10 +554,93 @@ export default function AssetApproval({ appliedFilters = {} }) {
     (searchTerm ? 1 : 0) +
     (currentTab !== "All" ? 1 : 0);
 
-  // Count selected images
   const selectedCount = Object.values(selectedImages).filter(Boolean).length;
 
-  // Handle export
+  // --- Function to handle approving an image (now with notes/comments) ---
+  const handleApproveImage = async () => {
+    if (!viewImageDialog.imageId) return;
+
+    // Determine the next status based on current status for "Approve" button
+    let nextStatus = "";
+    if (viewImageDialog.imageStatus.toUpperCase() === "SHOT") {
+      nextStatus = "IN PROGRESS";
+    } else if (viewImageDialog.imageStatus.toUpperCase() === "IN PROGRESS") {
+      nextStatus = "APPROVED"; // Or whatever the next logical step is after IN PROGRESS
+    } else {
+      // Handle other cases or disallow approval if not SHOT/IN PROGRESS
+      alert("This image cannot be approved from its current status.");
+      return;
+    }
+
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/admin/send/${viewImageDialog.imageId}`, // Backend expects /admin/send/:id
+        {
+          status: nextStatus,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${BEARER_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("Response from approving image:", response);
+      if (response.status === 200) {
+        alert(`Image status updated to '${nextStatus}' successfully!`);
+        setViewImageDialog({
+          ...viewImageDialog,
+          open: false,
+          notes: "",
+          comments: "",
+        }); // Close dialog and clear fields
+        fetchProducts(); // Re-fetch products to update UI
+      } else {
+        alert(`Failed to update image status: ${response.data.msg}`);
+      }
+    } catch (error) {
+      console.error("Error updating image status:", error);
+      alert("Error updating image status. Please try again.");
+    }
+  };
+
+  // --- Function to handle rejecting an image ---
+  const handleRejectImage = async () => {
+    if (!viewImageDialog.imageId) return;
+
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/admin/send/${viewImageDialog.imageId}`, // Or a separate reject endpoint if you have one
+        {
+          status: "REJECTED", // Example status for rejection
+          notes: viewImageDialog.notes, // Include notes on rejection
+          comments: viewImageDialog.comments, // Include comments on rejection
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${BEARER_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("Response from rejecting image:", response);
+      if (response.status === 200) {
+        alert("Image status updated to 'REJECTED' successfully!");
+        setViewImageDialog({
+          ...viewImageDialog,
+          open: false,
+          notes: "",
+          comments: "",
+        });
+        fetchProducts();
+      } else {
+        alert(`Failed to reject image: ${response.data.msg}`);
+      }
+    } catch (error) {
+      console.error("Error rejecting image:", error);
+      alert("Error rejecting image. Please try again.");
+    }
+  };
 
   // --- Image Processing and Export Function ---
   const handleExport = async () => {
@@ -678,14 +658,13 @@ export default function AssetApproval({ appliedFilters = {} }) {
 
     const exportFileName = `exported_assets_${new Date()
       .toISOString()
-      .slice(0, 10)}`; // e.g., exported_assets_2025-06-12
+      .slice(0, 10)}`;
 
     try {
       if (exportFormat === "zip") {
         const zip = new JSZip();
         const imagePromises = imagesToExport.map(async (image) => {
           try {
-            // Fetch image data as ArrayBuffer
             const response = await fetch(image.url);
             if (!response.ok)
               throw new Error(
@@ -693,18 +672,17 @@ export default function AssetApproval({ appliedFilters = {} }) {
               );
             const arrayBuffer = await response.arrayBuffer();
 
-            // Potentially resize/reformat if size is not 'original'
-            let finalBlob = new Blob([arrayBuffer], { type: "image/jpeg" }); // Assume original is JPEG for simplicity
-            let fileName = `${image.id}.jpg`; // Default filename
+            let finalBlob = new Blob([arrayBuffer], { type: "image/jpeg" });
+            let fileName = `${image.id}.jpg`;
 
             if (exportSize !== "original") {
               const img = new Image();
-              const blobUrl = URL.createObjectURL(finalBlob); // Create a blob URL for the Image object
+              const blobUrl = URL.createObjectURL(finalBlob);
               await new Promise((resolve) => {
                 img.onload = resolve;
                 img.src = blobUrl;
               });
-              URL.revokeObjectURL(blobUrl); // Clean up the blob URL
+              URL.revokeObjectURL(blobUrl);
 
               const canvas = document.createElement("canvas");
               const ctx = canvas.getContext("2d");
@@ -713,7 +691,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
               let targetHeight = img.height;
 
               if (exportSize === "platform") {
-                // Example platform specific sizes (adjust as needed for actual platforms)
                 if (exportPlatform === "Farfetch") {
                   targetWidth = 1500;
                   targetHeight = 2000;
@@ -721,14 +698,11 @@ export default function AssetApproval({ appliedFilters = {} }) {
                   targetWidth = 1000;
                   targetHeight = 1500;
                 }
-                // Add more platform logic
-                // Maintain aspect ratio if one dimension is set. For simplicity, we assume fixed sizes.
               } else if (exportSize === "custom") {
                 targetWidth = parseInt(customWidth, 10);
                 targetHeight = parseInt(customHeight, 10);
               }
 
-              // Ensure dimensions are valid numbers
               if (
                 isNaN(targetWidth) ||
                 isNaN(targetHeight) ||
@@ -748,23 +722,20 @@ export default function AssetApproval({ appliedFilters = {} }) {
 
               finalBlob = await new Promise((resolve) =>
                 canvas.toBlob(resolve, "image/jpeg", 0.9)
-              ); // Export as JPEG with quality 0.9
+              );
             }
 
-            zip.file(fileName, finalBlob); // Add processed image to zip
+            zip.file(fileName, finalBlob);
           } catch (error) {
             console.error(`Failed to add image ${image.id} to zip:`, error);
-            // Optionally, re-throw or handle specific errors
           }
         });
 
         await Promise.all(imagePromises);
 
-        // Generate the ZIP file and trigger download
         const content = await zip.generateAsync({ type: "blob" });
         saveAs(content, `${exportFileName}.zip`);
       } else if (exportFormat === "jpg") {
-        // For individual JPG download, if only one image is selected
         if (imagesToExport.length === 1) {
           const image = imagesToExport[0];
           const response = await fetch(image.url);
@@ -827,7 +798,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
 
           saveAs(finalBlob, fileName);
         } else {
-          // If multiple images are selected but format is JPG, alert user or consider forcing ZIP
           alert("To download multiple images, please select ZIP format.");
           setIsExporting(false);
           return;
@@ -838,12 +808,11 @@ export default function AssetApproval({ appliedFilters = {} }) {
         return;
       }
 
-      // Reset states after successful export
       setExportFormatDialog(false);
       setSelectedImages({});
       setExportDestination("");
       setExportPlatform("");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Export failed:", error);
       alert("Export failed: " + error.message);
     } finally {
@@ -851,12 +820,10 @@ export default function AssetApproval({ appliedFilters = {} }) {
     }
   };
 
-  // --- New function to handle Export Grid (Excel) ---
   const handleExportGrid = () => {
-    console.log("abnjh")
+    console.log("abnjh");
     const selectedImagesWithMetadata: any[] = [];
 
-    // Iterate through products and their images to find selected ones
     products.forEach((product) => {
       product.images.forEach((image) => {
         if (selectedImages[image.id]) {
@@ -868,12 +835,14 @@ export default function AssetApproval({ appliedFilters = {} }) {
             Season: product.season,
             "Merchandising Class": product.merchandisingClass,
             Gender: product.gender,
-            "Asset Type (Product)": product.assetType.join(", "), // Product-level asset types
+            "Asset Type (Product)": product.assetType.join(", "),
             "Image ID": image.id,
-            "Image Type": image.type, // Specific image type
+            "Image Type": image.type,
             "Image URL": image.url,
             "Product Status": product.status,
-            "Image Status": image.status || "N/A", // If image has its own status
+            "Image Status": image.status || "N/A",
+            Notes: image.notes || "", // Include notes in export
+            Comments: image.comments || "", // Include comments in export
           });
         }
       });
@@ -884,20 +853,16 @@ export default function AssetApproval({ appliedFilters = {} }) {
       return;
     }
 
-    // Create a worksheet
     const ws = XLSX.utils.json_to_sheet(selectedImagesWithMetadata);
 
-    // Create a workbook and add the worksheet
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Image Metadata");
 
-    // Generate and download the Excel file
     const excelFileName = `image_metadata_${new Date()
       .toISOString()
       .slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, excelFileName);
 
-    // Optionally, clear selected images after export
     setSelectedImages({});
   };
 
@@ -931,7 +896,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
       <StatusBar statusCounts={statusCounts} />
 
       <div className="container py-4">
-        {/* Search and action bar */}
         <div className="bg-white p-4 rounded-md border mb-4 shadow-sm">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <div className="relative w-full sm:w-96">
@@ -1262,7 +1226,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
               </DialogContent>
             </Dialog>
 
-            {/* Changed onClick to call handleExportGrid */}
             <Button
               variant="outline"
               size="sm"
@@ -1274,8 +1237,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
             </Button>
           </div>
 
-          {/* Active filters display */}
-          {activeLocalFilterCount > 0 && ( // Use activeLocalFilterCount here
+          {activeLocalFilterCount > 0 && (
             <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t">
               {activeFilters.merchandisingClass.map((merchandisingClass) => (
                 <Badge
@@ -1349,7 +1311,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
           )}
         </div>
 
-        {/* Status tabs */}
         <div className="bg-white rounded-md border mb-4 shadow-sm overflow-hidden">
           <Tabs
             defaultValue="All"
@@ -1365,35 +1326,65 @@ export default function AssetApproval({ appliedFilters = {} }) {
                 All
               </TabsTrigger>
               <TabsTrigger
-                value="Raw"
+                value="SHOT"
                 className="flex-1 rounded-none data-[state=active]:bg-background py-3 px-4"
               >
-                Raw
+                SHOT
               </TabsTrigger>
               <TabsTrigger
-                value="In Progress"
+                value="IN PROGRESS"
                 className="flex-1 rounded-none data-[state=active]:bg-background py-3 px-4"
               >
-                In Progress
+                IN PROGRESS
               </TabsTrigger>
               <TabsTrigger
-                value="Approved"
+                value="APPROVED"
                 className="flex-1 rounded-none data-[state=active]:bg-background py-3 px-4"
               >
-                Approved
+                APPROVED
               </TabsTrigger>
               <TabsTrigger
-                value="Delivered"
+                value="DELIVERED"
                 className="flex-1 rounded-none data-[state=active]:bg-background py-3 px-4"
               >
-                Delivered
+                DELIVERED
               </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
-        {/* Products list */}
-        {filteredProducts.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm">
+            <svg
+              className="animate-spin h-8 w-8 text-blue-500 mr-3"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            Loading products...
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm text-red-500">
+            <AlertCircle className="h-12 w-12 mb-4" />
+            <div className="text-lg font-medium mb-2">Error loading data</div>
+            <p className="text-sm">{error}</p>
+            <Button variant="outline" className="mt-4" onClick={fetchProducts}>
+              Retry
+            </Button>
+          </div>
+        ) : filteredProducts.length > 0 ? (
           <div className="space-y-4">
             {filteredProducts.map((product) => (
               <ProductRow
@@ -1402,7 +1393,10 @@ export default function AssetApproval({ appliedFilters = {} }) {
                 selectedImages={selectedImages}
                 onToggleSelect={toggleImageSelection}
                 onSelectAll={() => selectAllImages(product.id)}
-                onViewImage={(url, type) => viewImage(url, product, type)}
+                // Pass imageStatus, imageId, notes, and comments to onViewImage
+                onViewImage={(url, type, status, id, notes, comments) =>
+                  viewImage(url, product, type, status, id, notes, comments)
+                }
               />
             ))}
           </div>
@@ -1432,7 +1426,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
         )}
       </div>
 
-      {/* Image view dialog */}
       <Dialog
         open={viewImageDialog.open}
         onOpenChange={(open) =>
@@ -1465,14 +1458,22 @@ export default function AssetApproval({ appliedFilters = {} }) {
               )}
             </div>
           </div>
-          <div className="flex justify-between">
-            <Button variant="outline">
+          {/* Notes and Comments Section */}
+       
+          <div className="flex justify-between mt-4">
+            {/* Approve Button */}
+            {viewImageDialog.imageStatus.toUpperCase() === "SHOT" ||
+            viewImageDialog.imageStatus.toUpperCase() === "IN PROGRESS" ? (
+              <Button onClick={handleApproveImage}>
+                <Check className="mr-2 h-4 w-4" />
+                Approve
+              </Button>
+            ) : null}
+
+            {/* Reject Button (Always show for flexibility, or you can condition it) */}
+            <Button variant="outline" onClick={handleRejectImage}>
               <X className="mr-2 h-4 w-4" />
               Reject
-            </Button>
-            <Button>
-              <Check className="mr-2 h-4 w-4" />
-              Approve
             </Button>
           </div>
         </DialogContent>

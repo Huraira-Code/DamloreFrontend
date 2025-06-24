@@ -36,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
+import API_BASE_URL from "@/API_BASE_URL"; // Import your API base URL
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,10 +62,7 @@ export default function UserManagement() {
 
   // Placeholder for your API endpoint and Bearer Token
   // IMPORTANT: In a real application, these should be handled securely (e.g., environment variables, secure authentication flow)
-  const API_BASE_URL = "https://damlorefinal.vercel.app"; // Replace with your actual API base URL
-  const BEARER_TOKEN =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODQxMzNiZjA3MGVjMjY0NThlOTIxZjYiLCJlbWFpbCI6Imh1cmFpcmFzaGFoaWQwMDBAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzQ5MTAzNTk5LCJleHAiOjE3NTE2OTU1OTl9.ZvZr2jE2pEpxMnn4bYKdkqY1GoDmhts2zCecekHbbSA"; // Replace with your actual bearer token
-
+  const BEARER_TOKEN = localStorage.getItem("token")
   // Function to fetch users from the API
   const fetchUsers = async () => {
     setIsLoading(true);
