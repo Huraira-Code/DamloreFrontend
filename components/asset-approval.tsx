@@ -161,11 +161,11 @@ export default function AssetApproval({ appliedFilters = {} }) {
 
   // --- Transformation Function from Sessions to Products ---
   const transformSessionsToProducts = (sessions, users) => {
-    console.log(sessions);
     const productsTransformed = [];
 
     sessions.forEach((session) => {
-      session.shootingLists.forEach((list) => {
+      session.shootingListIDs.forEach((list) => {
+        // Use shootingListIDs as populated array
         const assignedUserObj = users.find((user) => user._id === list.userId);
         const assignedUserName = assignedUserObj
           ? assignedUserObj.name
@@ -177,25 +177,26 @@ export default function AssetApproval({ appliedFilters = {} }) {
           shootingName: list.name,
           farfetchId: list.farfetchId || "",
           barcode: list.barcode,
-          categories: [],
-          season: session?.name || "",
+          categories: [], // Populate if categories exist on your list/product
+          season: session?.name || "", // Assuming session name is season
           merchandisingClass: list.merchandisingclass,
           gender: list.gender,
           assetType: list.assetypes ? [list.assetypes] : [],
-          status: list.arrival,
+          status: list.arrival, // Assuming list.arrival is the product status
           assignedUser: assignedUserName,
-          images: list.images.map((img) => ({
+          // Images are now directly available via list.imageIDs
+          images: list.imageIDs.map((img) => ({
             id: img._id,
             status: img.status || "",
-            url: img.imageURL,
+            url: img.imageURL, // Assuming imageURL is the field for the image URL
             type: img.assetType || img.assetypes || "Unknown",
             sku: img.sku || list.sku,
             barcode: img.barcode || list.barcode,
             merchandisingClass:
               img.merchandisingClass || list.merchandisingclass,
             assetType: img.assetType || list.assetypes,
-            notes: img.notes || "", // Added notes from image data
-            comments: img.comments || "", // Added comments from image data
+            notes: img.notes || "",
+            comments: img.comments || "",
           })),
         };
         productsTransformed.push(transformedProduct);
@@ -229,12 +230,13 @@ export default function AssetApproval({ appliedFilters = {} }) {
     const BEARER_TOKEN = localStorage.getItem("token");
 
     try {
+      // Ensure users are fetched first if not already available
       if (fetchedUsers.length === 0) {
         await fetchUsers();
       }
 
       const sessionsResponse = await axios.get(
-        `${API_BASE_URL}/admin/sessions`,
+        `${API_BASE_URL}/admin/sessions`, // Single API call thanks to backend population
         {
           headers: {
             Authorization: `Bearer ${BEARER_TOKEN}`,
@@ -243,50 +245,9 @@ export default function AssetApproval({ appliedFilters = {} }) {
       );
 
       if (sessionsResponse.status === 200) {
-        const fetchedSessionsPromises =
-          sessionsResponse.data.shootingSessions.map(async (session) => {
-            const shootingListsFromSession =
-              session.shootingListIDs && Array.isArray(session.shootingListIDs)
-                ? session.shootingListIDs.filter((list) => list && list._id)
-                : [];
+        // The sessionsResponse.data.shootingSessions already contains populated lists and images
+        const fullyPopulatedSessions = sessionsResponse.data.shootingSessions;
 
-            const shootingListsWithFetchedImagesPromises =
-              shootingListsFromSession.map(async (list) => {
-                try {
-                  const imagesResponse = await axios.get(
-                    `${API_BASE_URL}/admin/images/${list._id}`,
-                    {
-                      headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
-                    }
-                  );
-                  return {
-                    ...list,
-                    images: imagesResponse.data.imagesData || [],
-                  };
-                } catch (imageError) {
-                  console.error(
-                    `Failed to fetch images for shooting list ID ${list._id}:`,
-                    imageError.response?.data?.msg || imageError.message
-                  );
-                  return { ...list, images: [] };
-                }
-              });
-
-            const shootingListsWithFetchedImages = await Promise.all(
-              shootingListsWithFetchedImagesPromises
-            );
-
-            return {
-              _id: session._id,
-              name: session.name,
-              assignedUser: session.assignedUser,
-              shootingLists: shootingListsWithFetchedImages,
-            };
-          });
-
-        const fullyPopulatedSessions = await Promise.all(
-          fetchedSessionsPromises
-        );
         const transformedData = transformSessionsToProducts(
           fullyPopulatedSessions,
           fetchedUsers
@@ -611,7 +572,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
   // --- Function to handle rejecting an image ---
   const handleRejectImage = async () => {
     if (!viewImageDialog.imageId) return;
-const BEARER_TOKEN = localStorage.getItem("token")
+    const BEARER_TOKEN = localStorage.getItem("token");
 
     try {
       const response = await axios.put(

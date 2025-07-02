@@ -167,88 +167,72 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
     }
   };
 
-  // --- Fetch ALL Sessions and their data (no filters applied here) ---
-  const fetchAllSessions = async () => {
-    const BEARER_TOKEN = localStorage.getItem("token");
+// --- Fetch ALL Sessions and their data (no filters applied here) ---
+const fetchAllSessions = async () => {
+  const BEARER_TOKEN = localStorage.getItem("token");
 
-    try {
-      const response = await axios.get(`${API_BASE_URL}/admin/sessions`, {
-        headers: {
-          Authorization: `Bearer ${BEARER_TOKEN}`,
-        },
-      });
+  try {
+    const response = await axios.get(`${API_BASE_URL}/admin/sessions`, { // This is now the ONLY API call for session/list/image data
+      headers: {
+        Authorization: `Bearer ${BEARER_TOKEN}`,
+      },
+    });
 
-      if (response.status === 200) {
-        const fetchedSessionsPromises = response.data.shootingSessions.map(
-          async (session) => {
-            const assignedUserObj = fetchedUsers.find(
-              (user) => user._id === session.assignedUser
-            );
-            const assignedUserName = assignedUserObj
-              ? assignedUserObj.name
-              : "Unknown User";
+    if (response.status === 200) {
+      const fetchedSessionsPromises = response.data.shootingSessions.map(
+        async (session) => { // Removed 'async' here as no more await inside
+          const assignedUserObj = fetchedUsers.find(
+            (user) => user._id === session.assignedUser
+          );
+          const assignedUserName = assignedUserObj
+            ? assignedUserObj.name
+            : "Unknown User";
 
-            const shootingListsFromSession =
-              session.shootingListIDs && Array.isArray(session.shootingListIDs)
-                ? session.shootingListIDs.filter((list) => list && list._id)
-                : [];
+          const shootingListsFromSession =
+            session.shootingListIDs && Array.isArray(session.shootingListIDs)
+              ? session.shootingListIDs.filter((list) => list && list._id)
+              : [];
 
-            const shootingListsWithFetchedImagesPromises =
-              shootingListsFromSession.map(async (list) => {
-                try {
-                  const imagesResponse = await axios.get(
-                    `${API_BASE_URL}/admin/images/${list._id}`,
-                    {
-                      headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
-                    }
-                  );
-                  return {
-                    ...list,
-                    images: imagesResponse.data.imagesData || [],
-                  };
-                } catch (imageError) {
-                  console.error(
-                    `Failed to fetch images for shooting list ID ${list._id}:`,
-                    imageError.response?.data?.msg || imageError.message
-                  );
-                  return { ...list, images: [] };
-                }
-              });
+          // *** CRUCIAL CHANGE HERE: The images are now directly on the list object ***
+          const shootingListsWithPopulatedImages = shootingListsFromSession.map(
+            (list) => {
+              // 'imageIDs' is the field your backend populates the image documents into
+              return {
+                ...list,
+                images: list.imageIDs || [], // Assuming the backend populated them into 'imageIDs'
+              };
+            }
+          );
 
-            const shootingListsWithFetchedImages = await Promise.all(
-              shootingListsWithFetchedImagesPromises
-            );
+          return {
+            _id: session._id,
+            name: session.name,
+            assignedUser: session.assignedUser,
+            user: assignedUserName,
+            title: session.name,
+            shootingLists: shootingListsWithPopulatedImages,
+          };
+        }
+      );
 
-            return {
-              _id: session._id,
-              name: session.name,
-              assignedUser: session.assignedUser,
-              user: assignedUserName,
-              title: session.name,
-              shootingLists: shootingListsWithFetchedImages,
-            };
-          }
-        );
-
-        const fullyPopulatedSessions = await Promise.all(
-          fetchedSessionsPromises
-        );
-        console.log(fullyPopulatedSessions);
-        // Store the full, unfiltered data
-        setAllSessions(fullyPopulatedSessions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch sessions (overall):", error);
-      setAlertDialogContent({
-        title: "API Error",
-        description:
-          error.response?.data?.message || "Failed to load sessions.",
-        type: "error",
-      });
-      setIsAlertDialogOpen(true);
-      setAllSessions([]); // Clear all sessions on error
+      // No need for Promise.all here if no more async operations inside map
+      const fullyPopulatedSessions = await Promise.all(fetchedSessionsPromises); // Actually, still need Promise.all if `assignedUserObj` fetching has asynchronous aspects, or if you had other async operations. If `fetchedUsers` is already resolved and in state, then no `await` here. Let's keep `Promise.all` for safety for now.
+      console.log(fullyPopulatedSessions);
+      // Store the full, unfiltered data
+      setAllSessions(fullyPopulatedSessions);
     }
-  };
+  } catch (error) {
+    console.error("Failed to fetch sessions (overall):", error);
+    setAlertDialogContent({
+      title: "API Error",
+      description:
+        error.response?.data?.message || "Failed to load sessions.",
+      type: "error",
+    });
+    setIsAlertDialogOpen(true);
+    setAllSessions([]); // Clear all sessions on error
+  }
+};
 
   // --- Initial Data Load (Users and then all Sessions) ---
   useEffect(() => {
