@@ -42,7 +42,7 @@ const Login = () => {
       if (err.response) {
         // Server responded with a status code out of 2xx range
         console.error("Server Response:", err.response);
-        setError(err.response.data?.message || "Server returned an error.");
+        setError(err.response.data?.msg || "Server returned an error.");
       } else if (err.request) {
         // Request was made but no response received
         console.error("No Response Received:", err.request);
