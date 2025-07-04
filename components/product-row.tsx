@@ -72,7 +72,7 @@ export default function ProductRow({
   // If you intend to show image-specific status color, you'll need to adapt this
   // to be displayed for each image in the map function.
   const statusColor = getColorForStatus(product.status);
-
+  console.log("ProductRow rendered with product:", product);
   return (
     <div className="bg-white border rounded-md overflow-hidden shadow-sm">
       <div className="bg-muted/30 p-3 flex justify-between items-center">
@@ -110,7 +110,7 @@ export default function ProductRow({
             <div className="aspect-square relative">
               <Image
                 src={image.url || "/placeholder.svg"}
-                alt={`Product ${product.code}`}
+                alt={`Product ${image.sku}`}
                 fill
                 className="object-cover"
               />
@@ -149,7 +149,7 @@ export default function ProductRow({
             </div>
 
             <div className="p-1 flex justify-between items-center bg-muted/10 text-xs">
-              <div className="truncate max-w-full">{product.code}</div>
+              <div className="truncate max-w-full">{image.sku}</div>
               {/* If you want to show image-specific status, you'd add it here */}
               <div
                 className={`px-1 rounded-sm text-white text-[10px] ${getColorForStatus(
