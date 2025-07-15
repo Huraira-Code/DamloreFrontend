@@ -30,9 +30,11 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
   const [allSessions, setAllSessions] = useState([]);
   // Use this state to display sessions, which will be filtered
   const [sessionsToDisplay, setSessionsToDisplay] = useState([]);
+  const [isSavingSession, setIsSavingSession] = useState(false);
 
   const [openSessionModal, setOpenSessionModal] = useState(false);
   const [newSession, setNewSession] = useState({ name: "", user: "" });
+  const [isLoading, setIsLoading] = useState(true);
 
   const [openImageDetailModal, setOpenImageDetailModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null); // Will store the image object when clicked
@@ -41,8 +43,7 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
 
   const [openShootingModal, setOpenShootingModal] = useState(false);
   const [shootingSessionIndex, setShootingSessionIndex] = useState(null);
-  const [shootingListForm, setShootingListForm] = useState({
-    name: "",
+  const [shootingSessionForm, setShootingSessionForm] = useState({
     sku: "",
     barcode: "",
     gender: "",
@@ -56,8 +57,6 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
   const [imageModal, setImageModal] = useState({
     open: false,
     sessionIdx: null,
-    listIdx: null,
-    sku: "",
     barcode: "",
     gender: "",
     merchandisingclass: "",
@@ -83,6 +82,11 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
     title: "",
     description: "",
     onConfirm: () => {},
+  });
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({
+    current: 0,
+    total: 0,
   });
 
   const BEARER_TOKEN = localStorage.getItem("token");
@@ -167,72 +171,69 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
     }
   };
 
-// --- Fetch ALL Sessions and their data (no filters applied here) ---
-const fetchAllSessions = async () => {
-  const BEARER_TOKEN = localStorage.getItem("token");
+  // --- Fetch ALL Sessions and their data (no filters applied here) ---
+  const fetchAllSessions = async () => {
+    setIsLoading(true);
+    const BEARER_TOKEN = localStorage.getItem("token");
 
-  try {
-    const response = await axios.get(`${API_BASE_URL}/admin/sessions`, { // This is now the ONLY API call for session/list/image data
-      headers: {
-        Authorization: `Bearer ${BEARER_TOKEN}`,
-      },
-    });
+    try {
+      const response = await axios.get(`${API_BASE_URL}/admin/sessions`, {
+        // This is now the ONLY API call for session/list/image data
+        headers: {
+          Authorization: `Bearer ${BEARER_TOKEN}`,
+        },
+      });
 
-    if (response.status === 200) {
-      const fetchedSessionsPromises = response.data.shootingSessions.map(
-        async (session) => { // Removed 'async' here as no more await inside
-          const assignedUserObj = fetchedUsers.find(
-            (user) => user._id === session.assignedUser
-          );
-          const assignedUserName = assignedUserObj
-            ? assignedUserObj.name
-            : "Unknown User";
+      if (response.status === 200) {
+        const fetchedSessionsPromises = response.data.shootingSessions.map(
+          async (session) => {
+            // Removed 'async' here as no more await inside
+            const assignedUserObj = fetchedUsers.find(
+              (user) => user._id === session.assignedUser
+            );
+            const assignedUserName = assignedUserObj
+              ? assignedUserObj.name
+              : "Unknown User";
 
-          const shootingListsFromSession =
-            session.shootingListIDs && Array.isArray(session.shootingListIDs)
-              ? session.shootingListIDs.filter((list) => list && list._id)
-              : [];
+            return {
+              _id: session._id,
+              name: session.name,
+              assignedUser: session.assignedUser,
+              user: assignedUserName,
+              barcode: session?.barcode,
+              gender: session?.gender,
+              merchandisingclass: session?.merchandisingclass,
+              assetypes: session?.assetypes,
+              arrival: session?.arrival,
+              title: session?.name,
+              imageIDs: session.imageIDs,
+            };
+          }
+        );
 
-          // *** CRUCIAL CHANGE HERE: The images are now directly on the list object ***
-          const shootingListsWithPopulatedImages = shootingListsFromSession.map(
-            (list) => {
-              // 'imageIDs' is the field your backend populates the image documents into
-              return {
-                ...list,
-                images: list.imageIDs || [], // Assuming the backend populated them into 'imageIDs'
-              };
-            }
-          );
+        // No need for Promise.all here if no more async operations inside map
+        const fullyPopulatedSessions = await Promise.all(
+          fetchedSessionsPromises
+        ); // Actually, still need Promise.all if `assignedUserObj` fetching has asynchronous aspects, or if you had other async operations. If `fetchedUsers` is already resolved and in state, then no `await` here. Let's keep `Promise.all` for safety for now.
+        console.log("debug1", fullyPopulatedSessions);
+        // Store the full, unfiltered data
+        setAllSessions(fullyPopulatedSessions);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Failed to fetch sessions (overall):", error);
+      setAlertDialogContent({
+        title: "API Error",
+        description:
+          error.response?.data?.message || "Failed to load sessions.",
+        type: "error",
+      });
+      setIsLoading(false);
 
-          return {
-            _id: session._id,
-            name: session.name,
-            assignedUser: session.assignedUser,
-            user: assignedUserName,
-            title: session.name,
-            shootingLists: shootingListsWithPopulatedImages,
-          };
-        }
-      );
-
-      // No need for Promise.all here if no more async operations inside map
-      const fullyPopulatedSessions = await Promise.all(fetchedSessionsPromises); // Actually, still need Promise.all if `assignedUserObj` fetching has asynchronous aspects, or if you had other async operations. If `fetchedUsers` is already resolved and in state, then no `await` here. Let's keep `Promise.all` for safety for now.
-      console.log(fullyPopulatedSessions);
-      // Store the full, unfiltered data
-      setAllSessions(fullyPopulatedSessions);
+      setIsAlertDialogOpen(true);
+      setAllSessions([]); // Clear all sessions on error
     }
-  } catch (error) {
-    console.error("Failed to fetch sessions (overall):", error);
-    setAlertDialogContent({
-      title: "API Error",
-      description:
-        error.response?.data?.message || "Failed to load sessions.",
-      type: "error",
-    });
-    setIsAlertDialogOpen(true);
-    setAllSessions([]); // Clear all sessions on error
-  }
-};
+  };
 
   // --- Initial Data Load (Users and then all Sessions) ---
   useEffect(() => {
@@ -406,11 +407,14 @@ const fetchAllSessions = async () => {
 
   // Update sessionsToDisplay whenever filteredSessions changes
   useEffect(() => {
+    console.log("debug2", filterSessions);
     setSessionsToDisplay(filterSessions);
   }, [filterSessions]);
 
   // --- Handle Add Session ---
   const handleAddSession = async () => {
+    setIsSavingSession(true);
+
     if (!newSession.name.trim() || !newSession.user) {
       setAlertDialogContent({
         title: "Validation Error",
@@ -428,6 +432,11 @@ const fetchAllSessions = async () => {
         {
           name: newSession.name.trim(),
           assignedUser: newSession.user,
+          barcode: shootingSessionForm.barcode,
+          gender: shootingSessionForm.gender,
+          assetypes: shootingSessionForm.assetypes,
+          merchandisingclass: shootingSessionForm.merchandisingclass,
+          arrival: shootingSessionForm.arrival,
         },
         {
           headers: {
@@ -450,6 +459,7 @@ const fetchAllSessions = async () => {
         });
         setIsAlertDialogOpen(true);
       }
+      setIsSavingSession(false);
     } catch (error) {
       console.error("Failed to add session:", error);
       setAlertDialogContent({
@@ -459,6 +469,8 @@ const fetchAllSessions = async () => {
           "Failed to add session. Please try again.",
         type: "error",
       });
+      setIsSavingSession(false);
+
       setIsAlertDialogOpen(true);
     }
   };
@@ -582,14 +594,13 @@ const fetchAllSessions = async () => {
 
     const {
       sessionIdx,
-      listIdx,
-      sku,
       barcode,
       gender,
       assetypes,
       merchandisingclass,
       arrival,
-    } = imageModal; // Destructure the new properties
+    } = imageModal;
+
     if (newImage.files.length === 0) {
       setAlertDialogContent({
         title: "Validation Error",
@@ -600,81 +611,72 @@ const fetchAllSessions = async () => {
       return;
     }
 
-    const shootingListId =
-      sessionsToDisplay[sessionIdx].shootingLists[listIdx]._id; // Use sessionsToDisplay here
+    setIsUploading(true); // Optional state to disable buttons/spinner
+    setUploadProgress({ current: 0, total: newImage.files.length }); // Optional: for progress bar
 
-    if (!shootingListId) {
-      setAlertDialogContent({
-        title: "Error",
-        description: "Could not find the shooting list ID to upload image.",
-        type: "error",
-      });
-      setIsAlertDialogOpen(true);
-      return;
-    }
+    let uploadedCount = 0;
+    let failedCount = 0;
 
-    const formData = new FormData();
-    formData.append("listId", shootingListId);
-    // Append the shooting list details to the form data
-    formData.append("sku", sku);
-    formData.append("barcode", barcode);
-    formData.append("gender", gender);
-    formData.append("merchandisingclass", merchandisingclass);
-    formData.append("assetypes", assetypes);
-    formData.append("arrival", arrival);
-    newImage.files.forEach((file) => {
-      formData.append("files", file);
-    });
+    for (let i = 0; i < newImage.files.length; i++) {
+      const file = newImage.files[i];
+      const formData = new FormData();
+      formData.append("sessionId", sessionIdx);
+      formData.append("barcode", barcode);
+      formData.append("gender", gender);
+      formData.append("merchandisingclass", merchandisingclass);
+      formData.append("assetypes", assetypes);
+      formData.append("arrival", arrival);
+      formData.append("files", file); // Still named "files" to match your backend
 
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/admin/upload`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${BEARER_TOKEN}`,
-          },
+      try {
+        const response = await axios.post(
+          `${API_BASE_URL}/admin/upload`,
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${BEARER_TOKEN}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
+        if (
+          response.status === 201 ||
+          (response.status === 200 &&
+            response.data.data &&
+            response.data.data.length > 0)
+        ) {
+          uploadedCount++;
+        } else {
+          console.warn("Unexpected response:", response);
+          failedCount++;
         }
-      );
-
-      if (
-        response.status === 201 ||
-        (response.status === 200 &&
-          response.data.data &&
-          response.data.data.length > 0)
-      ) {
-        // Re-fetch ALL sessions after uploading images
-        await fetchAllSessions();
-
-        setImageModal({ open: false, sessionIdx: null, listIdx: null });
-        setNewImage({ files: [] });
-
-        setAlertDialogContent({
-          title: "Success",
-          description: `${response.data.data.length} image(s) uploaded successfully! Reloading data...`,
-          type: "success",
-        });
-        setIsAlertDialogOpen(true);
-      } else {
-        setAlertDialogContent({
-          title: "Upload Error",
-          description:
-            "Image upload response was unexpected. No images returned.",
-          type: "error",
-        });
-        setIsAlertDialogOpen(true);
+      } catch (error) {
+        console.error(`Image ${i + 1} failed:`, error);
+        failedCount++;
       }
-    } catch (error) {
-      console.error("Failed to upload image:", error);
-      setAlertDialogContent({
-        title: "API Error",
-        description:
-          error.response?.data?.msg ||
-          "Failed to upload image. Please try again.",
-        type: "error",
+
+      // Update progress bar (optional)
+      setUploadProgress({
+        current: uploadedCount + failedCount,
+        total: newImage.files.length,
       });
-      setIsAlertDialogOpen(true);
     }
+
+    // Reset states
+    setIsUploading(false);
+    setNewImage({ files: [] });
+    setImageModal({ open: false, sessionIdx: null });
+
+    await fetchAllSessions();
+
+    // Show final result
+    setAlertDialogContent({
+      title: "Upload Finished",
+      description: `${uploadedCount} uploaded, ${failedCount} failed.`,
+      type: uploadedCount > 0 ? "success" : "error",
+    });
+    setIsAlertDialogOpen(true);
   };
 
   return (
@@ -685,7 +687,10 @@ const fetchAllSessions = async () => {
           <DialogTrigger asChild>
             <Button>Add Session</Button>
           </DialogTrigger>
-          <DialogContent className="space-y-4">
+          <DialogContent
+            style={{ height: "90%", overflowY: "scroll" }}
+            className="space-y-4"
+          >
             <DialogHeader>
               <DialogTitle>Add New Session</DialogTitle>
             </DialogHeader>
@@ -700,6 +705,109 @@ const fetchAllSessions = async () => {
                 }
                 placeholder="Enter session title"
               />
+            </div>
+
+            {["barcode"].map((field) => (
+              <div key={field} className="space-y-2">
+                <Label htmlFor={`shooting-${field}`}>
+                  {field.charAt(0).toUpperCase() + field.slice(1)}
+                </Label>
+                <Input
+                  id={`shooting-${field}`}
+                  value={shootingSessionForm[field]}
+                  onChange={(e) =>
+                    setShootingSessionForm({
+                      ...shootingSessionForm,
+                      [field]: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            ))}
+
+            <div className="space-y-2">
+              <Label htmlFor="arrival-status">Select Gender</Label>
+              <Select
+                onValueChange={(value) =>
+                  setShootingSessionForm({
+                    ...shootingSessionForm,
+                    gender: value,
+                  })
+                }
+                value={shootingSessionForm.gender}
+              >
+                <SelectTrigger id="arrival-status">
+                  <SelectValue placeholder="Select Gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Unisex">Uunisex</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="arrival-status">Select Merchandising Class</Label>
+              <Select
+                onValueChange={(value) =>
+                  setShootingSessionForm({
+                    ...shootingSessionForm,
+                    merchandisingclass: value,
+                  })
+                }
+                value={shootingSessionForm.merchandisingclass}
+              >
+                <SelectTrigger id="arrival-status">
+                  <SelectValue placeholder="Select Asset Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SOCKS">SOCKS</SelectItem>
+                  <SelectItem value="SET UNDERWEAR">SET UNDERWEAR</SelectItem>
+                  <SelectItem value="SCARF">SCARF</SelectItem>
+                  <SelectItem value="SMALL LEATHER GOODS">
+                    SMALL LEATHER GOODS
+                  </SelectItem>
+                  <SelectItem value="SUNGLASSES">SUNGLASSES</SelectItem>
+                  <SelectItem value="TIES">TIES</SelectItem>
+                  <SelectItem value="TOWEL">TOWEL</SelectItem>
+                  <SelectItem value="RTW (READY-TO-WEAR)">
+                    RTW (READY-TO-WEAR)
+                  </SelectItem>
+                  <SelectItem value="ACCESSORIES">ACCESSORIES</SelectItem>
+                  <SelectItem value="GLOVES">GLOVES</SelectItem>
+                  <SelectItem value="JEWELRY">JEWELRY</SelectItem>
+                  <SelectItem value="KEY CHAINS">KEY CHAINS</SelectItem>
+                  <SelectItem value="PAPILLONS">PAPILLONS</SelectItem>
+                  <SelectItem value="RINGS">RINGS</SelectItem>
+                  <SelectItem value="BAGS">BAGS</SelectItem>
+                  <SelectItem value="BELTS">BELTS</SelectItem>
+                  <SelectItem value="SHOES">SHOES</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="arrival-status">Select Asset Type</Label>
+              <Select
+                onValueChange={(value) =>
+                  setShootingSessionForm({
+                    ...shootingSessionForm,
+                    assetypes: value,
+                  })
+                }
+                value={shootingSessionForm.assetypes}
+              >
+                <SelectTrigger id="arrival-status">
+                  <SelectValue placeholder="Select Asset Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="On Model">On Model</SelectItem>
+                  <SelectItem value="Ghost">Ghost</SelectItem>
+                  <SelectItem value="Still Life">Still Life</SelectItem>
+                  <SelectItem value="Video">Video</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -744,9 +852,9 @@ const fetchAllSessions = async () => {
               </Select>
             </div>
 
-            <div className="flex justify-end pt-4">
-              <Button onClick={handleAddSession}>Save</Button>
-            </div>
+            <Button onClick={handleAddSession} disabled={isSavingSession}>
+              {isSavingSession ? "Saving..." : "Save"}
+            </Button>
           </DialogContent>
         </Dialog>
       </div>
@@ -758,149 +866,169 @@ const fetchAllSessions = async () => {
             <DialogTitle>Add Shooting List</DialogTitle>
           </DialogHeader>
 
-          {["name", "sku", "barcode", "gender"].map((field) => (
-            <div key={field} className="space-y-2">
-              <Label htmlFor={`shooting-${field}`}>
-                {field.charAt(0).toUpperCase() + field.slice(1)}
-              </Label>
-              <Input
-                id={`shooting-${field}`}
-                value={shootingListForm[field]}
-                onChange={(e) =>
-                  setShootingListForm({
-                    ...shootingListForm,
-                    [field]: e.target.value,
-                  })
-                }
-              />
-            </div>
-          ))}
-
-          <div className="space-y-2">
-            <Label htmlFor="arrival-status">Select Merchandising Class</Label>
-            <Select
-              onValueChange={(value) =>
-                setShootingListForm({
-                  ...shootingListForm,
-                  merchandisingclass: value,
-                })
-              }
-              value={shootingListForm.merchandisingclass}
-            >
-              <SelectTrigger id="arrival-status">
-                <SelectValue placeholder="Select Asset Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="SOCKS">SOCKS</SelectItem>
-                <SelectItem value="SET UNDERWEAR">SET UNDERWEAR</SelectItem>
-                <SelectItem value="SCARF">SCARF</SelectItem>
-                <SelectItem value="SMALL LEATHER GOODS">
-                  SMALL LEATHER GOODS
-                </SelectItem>
-                <SelectItem value="SUNGLASSES">SUNGLASSES</SelectItem>
-                <SelectItem value="TIES">TIES</SelectItem>
-                <SelectItem value="TOWEL">TOWEL</SelectItem>
-                <SelectItem value="RTW (READY-TO-WEAR)">
-                  RTW (READY-TO-WEAR)
-                </SelectItem>
-                <SelectItem value="ACCESSORIES">ACCESSORIES</SelectItem>
-                <SelectItem value="GLOVES">GLOVES</SelectItem>
-                <SelectItem value="JEWELRY">JEWELRY</SelectItem>
-                <SelectItem value="KEY CHAINS">KEY CHAINS</SelectItem>
-                <SelectItem value="PAPILLONS">PAPILLONS</SelectItem>
-                <SelectItem value="RINGS">RINGS</SelectItem>
-                <SelectItem value="BAGS">BAGS</SelectItem>
-                <SelectItem value="BELTS">BELTS</SelectItem>
-                <SelectItem value="SHOES">SHOES</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="shooting-list-assign-user">Assign User</Label>
-            <Select
-              onValueChange={(value) =>
-                setShootingListForm({ ...shootingListForm, user: value })
-              }
-              value={shootingListForm.user}
-              disabled={isUsersLoading || usersError}
-            >
-              <SelectTrigger id="shooting-list-assign-user">
-                <SelectValue
-                  placeholder={
-                    isUsersLoading
-                      ? "Loading users..."
-                      : usersError
-                      ? "Error loading users"
-                      : "Select a user"
+          {/* {["name", "sku", "barcode", "gender"].map((field) => (
+              <div key={field} className="space-y-2">
+                <Label htmlFor={`shooting-${field}`}>
+                  {field.charAt(0).toUpperCase() + field.slice(1)}
+                </Label>
+                <Input
+                  id={`shooting-${field}`}
+                  value={shootingSessionForm[field]}
+                  onChange={(e) =>
+                    setShootingListForm({
+                      ...shootingListForm,
+                      [field]: e.target.value,
+                    })
                   }
                 />
-              </SelectTrigger>
-              <SelectContent>
-                {usersError ? (
-                  <SelectItem value="error" disabled>
-                    <span className="flex items-center text-red-500">
-                      <XCircle className="h-4 w-4 mr-2" /> {usersError}
-                    </span>
-                  </SelectItem>
-                ) : fetchedUsers.length === 0 && !isUsersLoading ? (
-                  <SelectItem value="no-users" disabled>
-                    No users found
-                  </SelectItem>
-                ) : (
-                  fetchedUsers.map((user) => (
-                    <SelectItem key={user._id} value={user._id}>
-                      {user.name} (ID: {user._id})
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+              </div>
+            ))} */}
 
-          <div className="space-y-2">
-            <Label htmlFor="arrival-status">Select Asset Type</Label>
-            <Select
-              onValueChange={(value) =>
-                setShootingListForm({ ...shootingListForm, assetypes: value })
-              }
-              value={shootingListForm.assetypes}
-            >
-              <SelectTrigger id="arrival-status">
-                <SelectValue placeholder="Select Asset Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="On Model">On Model</SelectItem>
-                <SelectItem value="Ghost">Ghost</SelectItem>
-                <SelectItem value="Still Life">Still Life</SelectItem>
-                <SelectItem value="Video">Video</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="upload-images">Upload Images</Label>
-            <Input
-              id="upload-images"
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleShootingListImageUpload}
-            />
-            <div className="grid grid-cols-3 gap-2 pt-2">
-              {shootingListForm.images.map((img, idx) => (
-                <img
-                  key={idx}
-                  src={img}
-                  className="w-full h-24 object-cover rounded"
-                  alt={`Preview ${idx}`}
-                />
-              ))}
+          {/* <div className="space-y-2">
+              <Label htmlFor="arrival-status">Select Merchandising Class</Label>
+              <Select
+                onValueChange={(value) =>
+                  setShootingSessionForm({
+                    ...shootingSessionForm,
+                    merchandisingclass: value,
+                  })
+                }
+                value={shootingSessionForm.merchandisingclass}
+              >
+                <SelectTrigger id="arrival-status">
+                  <SelectValue placeholder="Select Asset Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SOCKS">SOCKS</SelectItem>
+                  <SelectItem value="SET UNDERWEAR">SET UNDERWEAR</SelectItem>
+                  <SelectItem value="SCARF">SCARF</SelectItem>
+                  <SelectItem value="SMALL LEATHER GOODS">
+                    SMALL LEATHER GOODS
+                  </SelectItem>
+                  <SelectItem value="SUNGLASSES">SUNGLASSES</SelectItem>
+                  <SelectItem value="TIES">TIES</SelectItem>
+                  <SelectItem value="TOWEL">TOWEL</SelectItem>
+                  <SelectItem value="RTW (READY-TO-WEAR)">
+                    RTW (READY-TO-WEAR)
+                  </SelectItem>
+                  <SelectItem value="ACCESSORIES">ACCESSORIES</SelectItem>
+                  <SelectItem value="GLOVES">GLOVES</SelectItem>
+                  <SelectItem value="JEWELRY">JEWELRY</SelectItem>
+                  <SelectItem value="KEY CHAINS">KEY CHAINS</SelectItem>
+                  <SelectItem value="PAPILLONS">PAPILLONS</SelectItem>
+                  <SelectItem value="RINGS">RINGS</SelectItem>
+                  <SelectItem value="BAGS">BAGS</SelectItem>
+                  <SelectItem value="BELTS">BELTS</SelectItem>
+                  <SelectItem value="SHOES">SHOES</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="arrival-status">Select Asset Type</Label>
+              <Select
+                onValueChange={(value) =>
+                  setShootingListForm({ ...shootingListForm, assetypes: value })
+                }
+                value={shootingListForm.assetypes}
+              >
+                <SelectTrigger id="arrival-status">
+                  <SelectValue placeholder="Select Asset Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="On Model">On Model</SelectItem>
+                  <SelectItem value="Ghost">Ghost</SelectItem>
+                  <SelectItem value="Still Life">Still Life</SelectItem>
+                  <SelectItem value="Video">Video</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="shooting-list-assign-user">Assign User</Label>
+              <Select
+                onValueChange={(value) =>
+                  setShootingListForm({ ...shootingListForm, user: value })
+                }
+                value={shootingListForm.user}
+                disabled={isUsersLoading || usersError}
+              >
+                <SelectTrigger id="shooting-list-assign-user">
+                  <SelectValue
+                    placeholder={
+                      isUsersLoading
+                        ? "Loading users..."
+                        : usersError
+                        ? "Error loading users"
+                        : "Select a user"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {usersError ? (
+                    <SelectItem value="error" disabled>
+                      <span className="flex items-center text-red-500">
+                        <XCircle className="h-4 w-4 mr-2" /> {usersError}
+                      </span>
+                    </SelectItem>
+                  ) : fetchedUsers.length === 0 && !isUsersLoading ? (
+                    <SelectItem value="no-users" disabled>
+                      No users found
+                    </SelectItem>
+                  ) : (
+                    fetchedUsers.map((user) => (
+                      <SelectItem key={user._id} value={user._id}>
+                        {user.name} (ID: {user._id})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div> */}
+
+          {/* <div className="space-y-2">
+              <Label htmlFor="arrival-status">Select Asset Type</Label>
+              <Select
+                onValueChange={(value) =>
+                  setShootingListForm({ ...shootingListForm, assetypes: value })
+                }
+                value={shootingListForm.assetypes}
+              >
+                <SelectTrigger id="arrival-status">
+                  <SelectValue placeholder="Select Asset Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="On Model">On Model</SelectItem>
+                  <SelectItem value="Ghost">Ghost</SelectItem>
+                  <SelectItem value="Still Life">Still Life</SelectItem>
+                  <SelectItem value="Video">Video</SelectItem>
+                </SelectContent>
+              </Select>
+            </div> */}
+
+          {/* <div className="space-y-2">
+              <Label htmlFor="upload-images">Upload Images</Label>
+              <Input
+                id="upload-images"
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleShootingListImageUpload}
+              />
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                {shootingListForm.images.map((img, idx) => (
+                  <img
+                    key={idx}
+                    src={img}
+                    className="w-full h-24 object-cover rounded"
+                    alt={`Preview ${idx}`}
+                  />
+                ))}
+              </div>
+            </div> */}
 
           <div className="flex justify-end pt-4">
-            <Button onClick={handleAddShootingList}>Add</Button>
+            <Button>Add</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -914,31 +1042,58 @@ const fetchAllSessions = async () => {
           <DialogHeader>
             <DialogTitle>Add Images</DialogTitle>
           </DialogHeader>
+          {isUploading ? (
+            <div className="mt-2 space-y-1 text-sm text-blue-600 w-full">
+              Uploading image {uploadProgress.current} of {uploadProgress.total}
+              ...
+              <div className="w-full bg-gray-200 h-2 rounded">
+                <div
+                  className="bg-blue-500 h-2 rounded transition-all duration-200"
+                  style={{
+                    width: `${
+                      (uploadProgress.current / uploadProgress.total) * 100
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="image-files">Image Files</Label>
+                <Input
+                  id="image-files"
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) =>
+                    setNewImage({
+                      ...newImage,
+                      files: Array.from(e.target.files),
+                    })
+                  }
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="image-files">Image Files</Label>
-            <Input
-              id="image-files"
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={(e) =>
-                setNewImage({
-                  ...newImage,
-                  files: Array.from(e.target.files),
-                })
-              }
-            />
-          </div>
-
-          <div className="flex justify-end pt-4">
-            <Button onClick={handleImageUpload}>Upload</Button>
-          </div>
+              <div className="flex justify-end pt-4">
+                <Button onClick={handleImageUpload}>Upload</Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* Sessions & Shooting Lists Display */}
-      {sessionsToDisplay.length > 0 ? ( // Use sessionsToDisplay for rendering
+      {isLoading ? ( // Show loading indicator if isLoading is true
+        <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm">
+          {/* You'll need to import a Spinner or LoadingDots component, or create a simple one */}
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+          <div className="text-lg font-medium mb-2">Loading sessions...</div>
+          <p className="text-sm text-muted-foreground">
+            Please wait while we fetch your data.
+          </p>
+        </div>
+      ) : sessionsToDisplay.length > 0 ? ( // Use sessionsToDisplay for rendering
         sessionsToDisplay.map((session, sIdx) => (
           <Card key={session._id || sIdx} className="mb-6 bg-white shadow-md">
             <CardContent className="p-4">
@@ -948,122 +1103,107 @@ const fetchAllSessions = async () => {
                   <p className="text-sm text-gray-500">
                     Assigned to: {session.user}
                   </p>
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      Gender: {session.gender} | Asset Type:{" "}
+                      {session?.assetypes}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Barcode: {session.barcode} | Merchandising Class:{" "}
+                      {session.merchandisingclass} | Status: {session.arrival}
+                    </p>
+                  </div>
                 </div>
-                <Button onClick={() => openShootingListModal(sIdx)}>
-                  Add Shooting List
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    setImageModal({
+                      open: true,
+                      sessionIdx: session._id,
+                      barcode: session.barcode,
+                      gender: session.gender,
+                      merchandisingclass: session.merchandisingclass,
+                      assetypes: session.assetypes,
+                      arrival: session.arrival,
+                    })
+                  }
+                >
+                  Add Image
                 </Button>
               </div>
 
-              {session.shootingLists.length === 0 ? (
+              {session?.imageIDs?.length === 0 ? (
                 <div className="py-4 text-center text-gray-500">
-                  No shooting lists for this session yet.
+                  No Image In the Session Yet.
                 </div>
               ) : (
-                session.shootingLists.map((list, lIdx) => (
-                  <div
-                    key={list._id || lIdx}
-                    className="border-t border-gray-300 pt-3 mb-4"
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <div>
-                        <h3 className="text-lg font-medium">{list.name}</h3>
-                        <p className="text-sm text-gray-600">
-                          SKU: {list.sku} | Gender: {list.gender} | Asset Type:{" "}
-                          {list?.assetypes}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Barcode: {list.barcode} | Merchandising Class:{" "}
-                          {list.merchandisingclass} | Status: {list.arrival}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          setImageModal({
-                            open: true,
-                            sessionIdx: sIdx,
-                            listIdx: lIdx,
-                            sku: list.sku,
-                            barcode: list.barcode,
-                            gender: list.gender,
-                            merchandisingclass: list.merchandisingclass,
-                            assetypes: list.assetypes,
-                            arrival: list.arrival,
-                          })
-                        }
-                      >
-                        Add Image
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {list.images && list.images.length > 0 ? (
-                        list.images.map((img, iIdx) => {
-                          // Determine the background color class based on the image status
-                          let statusBgClass = "bg-gray-500"; // Default color if status is not matched
-                          switch (img.status) {
-                            case "SHOT":
-                              statusBgClass = "bg-red-600"; // Red for SHOT
-                              break;
-                            case "IN PROGRESS":
-                              statusBgClass = "bg-orange-500"; // Orange for IN PROGRESS
-                              break;
-                            case "APPROVED":
-                              statusBgClass = "bg-green-600"; // Green for APPROVED
-                              break;
-                            case "DELIVERED":
-                              statusBgClass = "bg-blue-600"; // Blue for DELIVERED
-                              break;
-                            default:
-                              statusBgClass = "bg-gray-500"; // Fallback for unknown status
-                          }
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {session?.imageIDs && session?.imageIDs?.length > 0 ? (
+                    session?.imageIDs?.map((img, iIdx) => {
+                      console.log("mera bacha ", img);
+                      // Determine the background color class based on the image status
+                      let statusBgClass = "bg-gray-500"; // Default color if status is not matched
+                      switch (img.status) {
+                        case "SHOT":
+                          statusBgClass = "bg-red-600"; // Red for SHOT
+                          break;
+                        case "IN PROGRESS":
+                          statusBgClass = "bg-orange-500"; // Orange for IN PROGRESS
+                          break;
+                        case "APPROVED":
+                          statusBgClass = "bg-green-600"; // Green for APPROVED
+                          break;
+                        case "DELIVERED":
+                          statusBgClass = "bg-blue-600"; // Blue for DELIVERED
+                          break;
+                        default:
+                          statusBgClass = "bg-gray-500"; // Fallback for unknown status
+                      }
 
-                          return (
+                      return (
+                        <div
+                          key={img._id || iIdx}
+                          className="rounded-lg border p-2 bg-white cursor-pointer relative"
+                          onClick={() => {
+                            setSelectedImage(img);
+                            setEditedMetadata({
+                              ...img,
+                              assetType: img.assetypes || "",
+                              merchandisingClass: img.merchandisingclass || "", // Fix: Check for typo if 'merchandizingClass' is used elsewhere
+                            });
+                            setIsEditingMetadata(false);
+                            setOpenImageDetailModal(true);
+                          }}
+                        >
+                          <img
+                            src={img.imageURL}
+                            alt={`Image ${iIdx}`}
+                            className="rounded-lg w-full h-32 object-cover"
+                          />
+
+                          {/* Image Status Tablet with Dynamic Color */}
+                          {img.status && ( // Only render if img.status exists
                             <div
-                              key={img._id || iIdx}
-                              className="rounded-lg border p-2 bg-white cursor-pointer relative"
-                              onClick={() => {
-                                setSelectedImage(img);
-                                setEditedMetadata({
-                                  ...img,
-                                  assetType: img.assetType || "",
-                                  merchandisingClass:
-                                    img.merchandizingClass || "", // Fix: Check for typo if 'merchandizingClass' is used elsewhere
-                                });
-                                setIsEditingMetadata(false);
-                                setOpenImageDetailModal(true);
-                              }}
+                              className={`
+                          absolute top-2 right-2
+                          ${statusBgClass} text-white
+                          px-2 py-1 rounded-md
+                          text-xs font-medium
+                          shadow-md
+                        `}
                             >
-                              <img
-                                src={img.imageURL}
-                                alt={`Image ${iIdx}`}
-                                className="rounded-lg w-full h-32 object-cover"
-                              />
-
-                              {/* Image Status Tablet with Dynamic Color */}
-                              {img.status && ( // Only render if img.status exists
-                                <div
-                                  className={`
-              absolute top-2 right-2
-              ${statusBgClass} text-white
-              px-2 py-1 rounded-md
-              text-xs font-medium
-              shadow-md
-            `}
-                                >
-                                  {img.status}
-                                </div>
-                              )}
+                              {img.status}
                             </div>
-                          );
-                        })
-                      ) : (
-                        <div className="col-span-full text-center text-gray-500 text-sm py-2">
-                          No images for this list yet.
+                          )}
                         </div>
-                      )}
+                      );
+                    })
+                  ) : (
+                    <div className="col-span-full text-center text-gray-500 text-sm py-2">
+                      No images for this list yet.
                     </div>
-                  </div>
-                ))
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

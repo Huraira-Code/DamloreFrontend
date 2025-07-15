@@ -292,9 +292,13 @@ export default function UserManagement() {
 
         {/* User list table */}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm">
-            <div className="loading loading-spinner loading-lg text-muted-foreground mb-4"></div>
-            <div className="text-lg font-medium">Loading users...</div>
+           <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm">
+            {/* You'll need to import a Spinner or LoadingDots component, or create a simple one */}
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <div className="text-lg font-medium mb-2">Loading User...</div>
+            <p className="text-sm text-muted-foreground">
+              Please wait while we fetch your data.
+            </p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm text-red-500">

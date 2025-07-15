@@ -5,7 +5,7 @@ interface StatusBarProps {
     total: number;
     Raw: number;
     "In Progress": number;
-    Approved: number;
+    Ready: number;
     Delivered: number;
   };
 }
@@ -19,7 +19,7 @@ export default function StatusBar({ statusCounts }: StatusBarProps) {
   console.log("ms2", statusCounts);
 
   return (
-    <div className="bg-white border-b">
+    <div className="bg-white border-b" style={{ paddingLeft: "1rem", paddingRight: "1rem" }}>
       <div className="container py-2">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-6">
@@ -45,12 +45,12 @@ export default function StatusBar({ statusCounts }: StatusBarProps) {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="font-medium">APPROVED:</span>
+              <span className="font-medium">READY:</span>
               <Badge
                 variant="outline"
                 className="bg-green-50 text-green-600 hover:bg-green-50"
               >
-                {statusCounts.APPROVED} ({getPercentage(statusCounts.APPROVED)}
+                {statusCounts.READY} ({getPercentage(statusCounts.READY)}
                 %)
               </Badge>
             </div>

@@ -21,6 +21,7 @@ export default function AllSessions() {
       });
 
       setSessions(response.data.shootingSession);
+      console.log("Fetched sessions:", response.data.shootingSession);
     } catch (err) {
       console.error(err);
       setError(
@@ -35,12 +36,12 @@ export default function AllSessions() {
     fetchSessions(); // call it from inside useEffect
   }, []);
 
-  const updateImageStatus = async (imageId, newStatus) => {
+  const updateImageStatus = async (imageId, newStatus, comment) => {
     try {
       const token = localStorage.getItem("token");
-      await axios.put(
-        `${API_BASE_URL}/user/send/${imageId}`,
-        { status: newStatus },
+      await axios.patch(
+        `${API_BASE_URL}/user/rejectImage/${imageId}`,
+        { status: newStatus, comment },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -72,65 +73,57 @@ export default function AllSessions() {
             <li key={session._id} className="p-4 border rounded shadow">
               <h3 className="text-lg font-bold mb-2">{session.name}</h3>
 
-              {session.shootingListIDs?.map((list) => (
-                <div
-                  key={list._id}
-                  className="p-3 mb-4 border rounded bg-gray-50"
-                >
-                  <p>
-                    <strong>Shooting List:</strong> {list.name}
-                  </p>
-                  <p>
-                    <strong>SKU:</strong> {list.sku}
-                  </p>
-                  <p>
-                    <strong>Barcode:</strong> {list.barcode}
-                  </p>
-                  <p>
-                    <strong>Gender:</strong> {list.gender}
-                  </p>
-                  <p>
-                    <strong>Class:</strong> {list.merchandisingclass}
-                  </p>
-                  <p>
-                    <strong>Asset Type:</strong> {list.assetypes}
-                  </p>
-                  <p>
-                    <strong>Arrival:</strong> {list.arrival || "Not set"}
-                  </p>
+              <div
+                key={session._id}
+                className="p-3 mb-4 border rounded bg-gray-50"
+              >
+                <p>
+                  <strong>Barcode:</strong> {session.barcode}
+                </p>
+                <p>
+                  <strong>Gender:</strong> {session.gender}
+                </p>
+                <p>
+                  <strong>Class:</strong> {session.merchandisingclass}
+                </p>
+                <p>
+                  <strong>Asset Type:</strong> {session.assetypes}
+                </p>
+                <p>
+                  <strong>Arrival:</strong> {session.arrival || "Not set"}
+                </p>
 
-                  {list.imageIDs?.length > 0 && (
-                    <div className="mt-3">
-                      <strong>Images:</strong>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2">
-                        {list.imageIDs
-                          .filter(
-                            (img) =>
-                              img.status === "APPROVED" ||
-                              img.status === "IN PROGRESS" ||
-                              img.status === "DELIVERED"
-                          )
-                          .map((img) => (
-                            <div
-                              key={img._id}
-                              className="text-center cursor-pointer"
-                              onClick={() => setSelectedImage(img)}
-                            >
-                              <img
-                                src={img.imageURL}
-                                alt="session"
-                                className="w-full h-32 object-cover rounded hover:scale-105 transition-transform"
-                              />
-                              <p className="text-sm text-gray-600 mt-1">
-                                {img.status}
-                              </p>
-                            </div>
-                          ))}
-                      </div>
+                {session.imageIDs?.length > 0 && (
+                  <div className="mt-3">
+                    <strong>Images:</strong>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2">
+                      {session.imageIDs
+                        .filter(
+                          (img) =>
+                            img.status === "READY" ||
+                            img.status === "IN PROGRESS" ||
+                            img.status === "DELIVERED"
+                        )
+                        .map((img) => (
+                          <div
+                            key={img._id}
+                            className="text-center cursor-pointer"
+                            onClick={() => setSelectedImage(img)}
+                          >
+                            <img
+                              src={img.imageURL}
+                              alt="session"
+                              className="w-full h-32 object-cover rounded hover:scale-105 transition-transform"
+                            />
+                            <p className="text-sm text-gray-600 mt-1">
+                              {img.status}
+                            </p>
+                          </div>
+                        ))}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -181,37 +174,73 @@ export default function AllSessions() {
                 <strong>Arrival:</strong> {selectedImage.arrival || "Not set"}
               </p>
               <div>
-                <strong>Comments:</strong>
-                {selectedImage.comments?.length > 0 ? (
-                  <ul className="list-disc ml-6 mt-1">
-                    {selectedImage.comments.map((c, i) => (
-                      <li key={i}>{c}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="ml-2 text-gray-500">No comments</p>
+                {selectedImage.versionHistory?.length > 0 && (
+                  <div className="mt-4">
+                    <strong className="block text-sm font-semibold mb-1">
+                      Comments History:
+                    </strong>
+                    <ul className="list-disc ml-6 space-y-1 text-sm text-gray-700">
+                      {selectedImage.versionHistory
+                        .sort((a, b) => a.versionNumber - b.versionNumber) // Optional: sort by versionNumber
+                        .map((version, idx) => (
+                          <li key={idx}>
+                            V{version.versionNumber}:{" "}
+                            {version.reason || "No comment"}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
                 )}
+
+                {/* Add Comment Input */}
+                <div className="mt-2">
+                  <label className="block text-sm font-semibold">Comment</label>
+                  <textarea
+                    placeholder="Add a comment before rejecting..."
+                    value={selectedImage.comment || ""}
+                    onChange={(e) =>
+                      setSelectedImage({
+                        ...selectedImage,
+                        comment: e.target.value,
+                      })
+                    }
+                    className="w-full p-2 border rounded text-sm"
+                    rows={3}
+                  ></textarea>
+                </div>
               </div>
-              {/* Action Buttons */}
-              {/* Show buttons only if image is APPROVED */}
-              {selectedImage.status === "APPROVED" && (
-                <div className="mt-2 flex justify-center gap-2">
+
+              {/* Action Buttons: only if status is READY and comment exists */}
+              {selectedImage.status === "READY" && (
+                <div className="mt-4 flex justify-center gap-2">
                   <button
                     onClick={() =>
-                      updateImageStatus(selectedImage._id, "DELIVERED")
+                      updateImageStatus(
+                        selectedImage._id,
+                        "DELIVERED",
+                        selectedImage.comment || ""
+                      )
                     }
                     className="bg-green-500 text-white text-sm px-3 py-1 rounded hover:bg-green-600"
                   >
                     Mark as Delivered
                   </button>
-                  <button
-                    onClick={() =>
-                      updateImageStatus(selectedImage._id, "IN PROGRESS")
-                    }
-                    className="bg-red-500 text-white text-sm px-3 py-1 rounded hover:bg-red-600"
-                  >
-                    Reject
-                  </button>
+
+                  {/* Only show Reject if comment exists */}
+                  {selectedImage.comment?.trim() && (
+                    <button
+                      onClick={() =>
+                        updateImageStatus(
+                          selectedImage._id,
+                          "IN PROGRESS",
+                          selectedImage.comment
+                        )
+                      }
+                      className="bg-red-500 text-white text-sm px-3 py-1 rounded hover:bg-red-600"
+                    >
+                      Reject
+                    </button>
+                  )}
                 </div>
               )}
             </div>

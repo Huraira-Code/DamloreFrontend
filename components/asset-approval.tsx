@@ -24,6 +24,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress"; // Assuming shadcn/ui Progress component
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+dayjs.extend(relativeTime);
 import {
   Dialog,
   DialogContent,
@@ -74,12 +78,12 @@ const getStatusCounts = (products) => {
     total: products.length,
     SHOT: 0,
     "IN PROGRESS": 0,
-    APPROVED: 0,
+    READY: 0,
     DELIVERED: 0,
   };
 
   products.forEach((product) => {
-    product.images.forEach((e) => {
+    product?.images?.forEach((e) => {
       console.log("me2", e);
       const status = e.status;
       console.log("this is sattus", product.status);
@@ -112,6 +116,26 @@ const merchandisingClasses = [
   "SHOES",
 ];
 
+const LoadingModal = ({ isOpen, deletedCount, totalCount }) => {
+  const progressValue = totalCount > 0 ? (deletedCount / totalCount) * 100 : 0;
+
+  return (
+    <Dialog open={isOpen}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Deleting Images</DialogTitle>
+        </DialogHeader>
+        <div className="py-4 text-center">
+          <p className="mb-4">
+            Deleting images... ({deletedCount} / {totalCount} deleted)
+          </p>
+          <Progress value={progressValue} className="w-full" />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export default function AssetApproval({ appliedFilters = {} }) {
   // --- New State for Data Fetching ---
   const [products, setProducts] = useState([]);
@@ -136,6 +160,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
     imageId: "",
     notes: "", // Added notes to the dialog state
     comments: "", // Added comments to the dialog state
+    versionHistory: [], // Added version history to the dialog state
   });
   const [statusCounts, setStatusCounts] = useState(getStatusCounts([]));
   const [exportFormatDialog, setExportFormatDialog] = useState(false);
@@ -147,6 +172,19 @@ export default function AssetApproval({ appliedFilters = {} }) {
   const [customHeight, setCustomHeight] = useState("1200");
   const [includeMetadata, setIncludeMetadata] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [newImage, setNewImage] = useState({ file: null });
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [newNote, setNewNote] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageModal, setImageModal] = useState({
+    open: false,
+    imageId: null,
+    sessionId: null,
+  });
+  const [deletedCount, setDeletedCount] = useState(0);
+  const [selectedVersion, setSelectedVersion] = useState(null); // null = original image
+  const [totalImagesToDelete, setTotalImagesToDelete] = useState(0); // New state for total count
   const [activeFilters, setActiveFilters] = useState<{
     season: string[];
     merchandisingClass: string[];
@@ -158,49 +196,63 @@ export default function AssetApproval({ appliedFilters = {} }) {
     gender: [],
     assetType: [],
   });
-
+  const [promoteModal, setPromoteModal] = useState({
+    open: false,
+    shotImages: [] as Array<{
+      id: string;
+      url: string;
+      status: string;
+      productId: string;
+    }>,
+    inProgressImages: [] as Array<{
+      id: string;
+      url: string;
+      status: string;
+      productId: string;
+    }>,
+  });
   // --- Transformation Function from Sessions to Products ---
   const transformSessionsToProducts = (sessions, users) => {
     const productsTransformed = [];
 
     sessions.forEach((session) => {
-      session.shootingListIDs.forEach((list) => {
-        // Use shootingListIDs as populated array
-        const assignedUserObj = users.find((user) => user._id === list.userId);
-        const assignedUserName = assignedUserObj
-          ? assignedUserObj.name
-          : "Unknown User";
+      console.log("avoided sesson", session);
+      // Use shootingListIDs as populated array
+      const assignedUserObj = users.find(
+        (user) => user._id === session?.assignedUser
+      );
+      console.log("assigned username", assignedUserObj);
+      const assignedUserName = assignedUserObj
+        ? assignedUserObj.name
+        : "Unknown User";
 
-        const transformedProduct = {
-          id: list._id,
-          code: list.sku || list.name,
-          shootingName: list.name,
-          farfetchId: list.farfetchId || "",
-          barcode: list.barcode,
-          categories: [], // Populate if categories exist on your list/product
-          season: session?.name || "", // Assuming session name is season
-          merchandisingClass: list.merchandisingclass,
-          gender: list.gender,
-          assetType: list.assetypes ? [list.assetypes] : [],
-          status: list.arrival, // Assuming list.arrival is the product status
-          assignedUser: assignedUserName,
-          // Images are now directly available via list.imageIDs
-          images: list.imageIDs.map((img) => ({
-            id: img._id,
-            status: img.status || "",
-            url: img.imageURL, // Assuming imageURL is the field for the image URL
-            type: img.assetType || img.assetypes || "Unknown",
-            sku: img.sku || list.sku,
-            barcode: img.barcode || list.barcode,
-            merchandisingClass:
-              img.merchandisingClass || list.merchandisingclass,
-            assetType: img.assetType || list.assetypes,
-            notes: img.notes || "",
-            comments: img.comments || "",
-          })),
-        };
-        productsTransformed.push(transformedProduct);
-      });
+      const transformedProduct = {
+        barcode: session.barcode,
+        categories: [], // Populate if categories exist on your list/product
+        season: session?.name || "", // Assuming session name is season
+        merchandisingClass: session.merchandisingclass,
+        gender: session.gender,
+        assetType: session.assetypes ? [session.assetypes] : [],
+        status: session.arrival, // Assuming list.arrival is the product status
+        assignedUser: assignedUserName,
+        id: session._id,
+        // Images are now directly available via list.imageIDs
+        images: session?.imageIDs?.map((img) => ({
+          id: img._id,
+          status: img.status || "",
+          url: img.imageURL, // Assuming imageURL is the field for the image URL
+          type: img.assetType || img.assetypes || "Unknown",
+          sku: img.sku || session.sku,
+          barcode: img.barcode || session.barcode,
+          merchandisingClass:
+            img.merchandisingClass || session.merchandisingclass,
+          assetType: img.assetType || session.assetypes,
+          notes: img.notes || "",
+          comments: img.comments || "",
+          versionHistory: img.versionHistory || [], // Assuming versionHistroy is the field for version history
+        })),
+      };
+      productsTransformed.push(transformedProduct);
     });
     return productsTransformed;
   };
@@ -247,11 +299,12 @@ export default function AssetApproval({ appliedFilters = {} }) {
       if (sessionsResponse.status === 200) {
         // The sessionsResponse.data.shootingSessions already contains populated lists and images
         const fullyPopulatedSessions = sessionsResponse.data.shootingSessions;
-
+        console.log("Fetched sessions:", fullyPopulatedSessions);
         const transformedData = transformSessionsToProducts(
           fullyPopulatedSessions,
           fetchedUsers
         );
+        console.log("Transformed products:", transformedData);
         setProducts(transformedData);
         setStatusCounts(getStatusCounts(transformedData));
       }
@@ -271,11 +324,10 @@ export default function AssetApproval({ appliedFilters = {} }) {
     const BEARER_TOKEN = localStorage.getItem("token");
 
     try {
-      const response = await axios.put(
-        `${API_BASE_URL}/admin/send/${viewImageDialog.imageId}`,
+      const response = await axios.post(
+        `${API_BASE_URL}/admin/notes/${viewImageDialog.imageId}`,
         {
-          notes: viewImageDialog.notes,
-          comments: viewImageDialog.comments,
+          note: newNote,
         },
         {
           headers: {
@@ -284,7 +336,6 @@ export default function AssetApproval({ appliedFilters = {} }) {
           },
         }
       );
-
       console.log("Response from saving notes:", response);
       if (response.status === 200) {
         alert("Notes and comments saved successfully!");
@@ -294,20 +345,12 @@ export default function AssetApproval({ appliedFilters = {} }) {
         // This assumes your backend returns the updated imageData in the response,
         // which is good practice. If not, you might need to find the specific
         // image in your 'products' state and update it there, or re-fetch all products.
-        setViewImageDialog((prevDialog) => ({
-          ...prevDialog,
-          // Update with the values that were just successfully saved
-          notes: prevDialog.notes,
-          comments: prevDialog.comments,
-          // If your backend returns the updated image data, you can use:
-          // notes: response.data.imageData.notes || "",
-          // comments: response.data.imageData.comments || "",
+        setViewImageDialog((prev) => ({
+          ...prev,
+          notes: [...prev.notes, newNote],
         }));
-
-        // Re-fetch products to ensure overall data consistency across the app,
-        // especially if notes/comments are also displayed in ProductRow.
-        fetchProducts();
-        // *** FIX END ***
+        setNewNote(""); // Clear the input
+        fetchProducts(); // Refresh data
       } else {
         alert(`Failed to save notes: ${response.data.msg}`);
       }
@@ -315,6 +358,14 @@ export default function AssetApproval({ appliedFilters = {} }) {
       console.error("Error saving notes:", error);
       alert("Error saving notes. Please try again.");
     }
+  };
+
+  const openImageVersionDialog = (imageId, sessionId) => {
+    setImageModal({
+      open: true,
+      imageId,
+      sessionId,
+    });
   };
 
   // --- Initial Data Load on Mount ---
@@ -401,7 +452,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
       );
     }
 
-    result = [...result].sort((a, b) => a.code.localeCompare(b.code));
+    result = [...result].sort((a, b) => a?.code?.localeCompare(b.code));
 
     return result;
   }, [products, currentTab, searchTerm, activeFilters, appliedFilters]);
@@ -433,6 +484,8 @@ export default function AssetApproval({ appliedFilters = {} }) {
   };
 
   const selectAllImages = (productId: string) => {
+    console.log("select Image", productId);
+    console.log("products ", products);
     const product = products.find((p) => p.id === productId);
     if (!product) return;
 
@@ -447,6 +500,135 @@ export default function AssetApproval({ appliedFilters = {} }) {
     setSelectedImages(newSelectedImages);
   };
 
+  const onDeleteSelected = async (productId: string) => {
+    const imageIdsToDelete = Object.keys(selectedImages).filter(
+      (imageId) => selectedImages[imageId]
+    );
+
+    if (imageIdsToDelete.length === 0) {
+      alert("No images selected for deletion.");
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeletedCount(0);
+    setTotalImagesToDelete(imageIdsToDelete.length); // Set total count
+
+    const productToUpdate = products.find((p) => p.id === productId);
+    if (!productToUpdate) {
+      setIsDeleting(false);
+      alert("Product not found.");
+      return;
+    }
+
+    let successfullyDeleted: string[] = [];
+    const BEARER_TOKEN = localStorage.getItem("token");
+
+    for (const imageId of imageIdsToDelete) {
+      try {
+        const response = await axios.delete(
+          `${API_BASE_URL}/admin/deleteimage/${productId}/${imageId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${BEARER_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const result = response.data;
+
+        if (response.status === 200) {
+          console.log(`Successfully deleted image ${imageId}:`, result.msg);
+          successfullyDeleted.push(imageId);
+          setDeletedCount((prev) => prev + 1);
+        } else {
+          console.error(`Failed to delete image ${imageId}:`, result.msg);
+          // Optionally, show an error for individual image deletion
+          alert(`Failed to delete image ${imageId}: ${result.msg}`);
+        }
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response) {
+          console.error(
+            `Failed to delete image ${imageId}:`,
+            error.response.data.msg
+          );
+          alert(
+            `Failed to delete image ${imageId}: ${error.response.data.msg}`
+          );
+        } else {
+          console.error(`Error deleting image ${imageId}:`, error);
+          alert(`Error deleting image ${imageId}: ${error.message}`);
+        }
+      }
+    }
+
+    // Update the UI state only with images that were successfully deleted
+    setProducts((prevProducts) =>
+      prevProducts.map((product) => {
+        if (product.id === productId) {
+          const updatedImages = product.images.filter(
+            (image) => !successfullyDeleted.includes(image.id)
+          );
+          return { ...product, images: updatedImages };
+        }
+        return product;
+      })
+    );
+
+    // Clear the selection for the images that were attempted to be deleted
+    setSelectedImages((prev) => {
+      const newSelection = { ...prev };
+      imageIdsToDelete.forEach((imageId) => {
+        delete newSelection[imageId];
+      });
+      return newSelection;
+    });
+
+    setIsDeleting(false);
+    alert(
+      `Deletion process completed. Successfully deleted ${successfullyDeleted.length} out of ${imageIdsToDelete.length} selected images.`
+    );
+  };
+
+  const onPromoteSelected = async (productId: string) => {
+    const selectedImageIds = Object.keys(selectedImages).filter(
+      (imageId) => selectedImages[imageId]
+    );
+
+    if (selectedImageIds.length === 0) {
+      alert("No images selected for promotion.");
+      return;
+    }
+
+    const shotImages = [];
+    const inProgressImages = [];
+
+    for (const product of products) {
+      for (const image of product.images) {
+        if (selectedImageIds.includes(image.id)) {
+          const imageData = {
+            id: image.id,
+            url: image.url,
+            status: image.status,
+            productId: product.id,
+          };
+
+          if (image.status === "SHOT") {
+            shotImages.push(imageData);
+          } else if (image.status === "IN PROGRESS") {
+            inProgressImages.push(imageData);
+          }
+        }
+      }
+    }
+
+    setPromoteModal({
+      open: true,
+      shotImages,
+      inProgressImages,
+    });
+  };
   // Modified viewImage to include notes and comments from the image object
   const viewImage = (
     url: string,
@@ -455,7 +637,8 @@ export default function AssetApproval({ appliedFilters = {} }) {
     imageStatus: string,
     imageId: string,
     notes: string = "",
-    comments: string = ""
+    comments: string = "",
+    versionHistory: any[] = []
   ) => {
     console.log("Viewing image:", {
       url,
@@ -465,6 +648,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
       imageId,
       notes,
       comments,
+      versionHistory,
     });
     setViewImageDialog({
       open: true,
@@ -475,6 +659,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
       imageId,
       notes, // Set existing notes
       comments, // Set existing comments
+      versionHistory,
     });
   };
 
@@ -530,7 +715,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
     if (viewImageDialog.imageStatus.toUpperCase() === "SHOT") {
       nextStatus = "IN PROGRESS";
     } else if (viewImageDialog.imageStatus.toUpperCase() === "IN PROGRESS") {
-      nextStatus = "APPROVED"; // Or whatever the next logical step is after IN PROGRESS
+      nextStatus = "READY"; // Or whatever the next logical step is after IN PROGRESS
     } else {
       // Handle other cases or disallow approval if not SHOT/IN PROGRESS
       alert("This image cannot be approved from its current status.");
@@ -569,42 +754,44 @@ export default function AssetApproval({ appliedFilters = {} }) {
     }
   };
 
-  // --- Function to handle rejecting an image ---
-  const handleRejectImage = async () => {
-    if (!viewImageDialog.imageId) return;
-    const BEARER_TOKEN = localStorage.getItem("token");
+  const handleVersionUpload = async () => {
+    if (!newImage.file || !imageModal.imageId || !imageModal.sessionId) return;
+    console.log(
+      "new session account",
+      newImage.file,
+      imageModal.imageId,
+      imageModal.sessionId
+    );
 
     try {
-      const response = await axios.put(
-        `${API_BASE_URL}/admin/send/${viewImageDialog.imageId}`, // Or a separate reject endpoint if you have one
-        {
-          status: "REJECTED", // Example status for rejection
-          notes: viewImageDialog.notes, // Include notes on rejection
-          comments: viewImageDialog.comments, // Include comments on rejection
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      const formData = new FormData();
+      formData.append("files", newImage.file);
+      formData.append("imageId", imageModal.imageId);
+      formData.append("sessionId", imageModal.sessionId);
+      const BEARER_TOKEN = localStorage.getItem("token");
+
+      const res = await axios.post(`${API_BASE_URL}/admin/addImage`, formData, {
+        headers: {
+          Authorization: `Bearer ${BEARER_TOKEN}`,
+          "Content-Type": "multipart/form-data",
         },
-        {
-          headers: {
-            Authorization: `Bearer ${BEARER_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      console.log("Response from rejecting image:", response);
-      if (response.status === 200) {
-        alert("Image status updated to 'REJECTED' successfully!");
-        setViewImageDialog({
-          ...viewImageDialog,
-          open: false,
-          notes: "",
-          comments: "",
-        });
-        fetchProducts();
-      } else {
-        alert(`Failed to reject image: ${response.data.msg}`);
-      }
-    } catch (error) {
-      console.error("Error rejecting image:", error);
-      alert("Error rejecting image. Please try again.");
+        onUploadProgress: (progressEvent) => {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setUploadProgress(percent);
+        },
+      });
+      console.log("motku huraira", res);
+      setImageModal({ ...imageModal, open: false });
+      setNewImage({ file: null });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -834,7 +1021,10 @@ export default function AssetApproval({ appliedFilters = {} }) {
 
   return (
     <div className="flex flex-col">
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div
+        className="bg-white border-b sticky top-0 z-10"
+        style={{ paddingLeft: "1rem", paddingRight: "1rem" }}
+      >
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold">Asset Approval</h1>
@@ -862,9 +1052,15 @@ export default function AssetApproval({ appliedFilters = {} }) {
       <StatusBar statusCounts={statusCounts} />
 
       <div className="container py-4">
-        <div className="bg-white p-4 rounded-md border mb-4 shadow-sm">
+        <div
+          className="bg-white p-4 rounded-md border mb-4 shadow-sm"
+          style={{ marginLeft: "1rem", marginRight: "1rem" }}
+        >
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-            <div className="relative w-full sm:w-96">
+            <div
+              className="relative w-full sm:w-96"
+              style={{ maxHeight: "65%" }}
+            >
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by product code, Farfetch ID, barcode..."
@@ -922,8 +1118,8 @@ export default function AssetApproval({ appliedFilters = {} }) {
               </div>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <DropdownMenu style={{ height: "65%" }}>
+              <DropdownMenuTrigger>
                 <Button
                   variant="outline"
                   size="sm"
@@ -938,7 +1134,11 @@ export default function AssetApproval({ appliedFilters = {} }) {
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent
+                align="end"
+                className="w-56"
+                style={{ height: "100%" }}
+              >
                 <div className="p-2">
                   <div className="font-medium text-sm mb-1">Asset Type</div>
                   {assetTypes.map((assetType) => (
@@ -1277,7 +1477,10 @@ export default function AssetApproval({ appliedFilters = {} }) {
           )}
         </div>
 
-        <div className="bg-white rounded-md border mb-4 shadow-sm overflow-hidden">
+        <div
+          className="bg-white rounded-md border mb-4 shadow-sm overflow-hidden"
+          style={{ marginRight: "1rem", marginLeft: "1rem" }}
+        >
           <Tabs
             defaultValue="All"
             value={currentTab}
@@ -1304,10 +1507,10 @@ export default function AssetApproval({ appliedFilters = {} }) {
                 IN PROGRESS
               </TabsTrigger>
               <TabsTrigger
-                value="APPROVED"
+                value="READY"
                 className="flex-1 rounded-none data-[state=active]:bg-background py-3 px-4"
               >
-                APPROVED
+                READY
               </TabsTrigger>
               <TabsTrigger
                 value="DELIVERED"
@@ -1320,26 +1523,13 @@ export default function AssetApproval({ appliedFilters = {} }) {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm">
-            <svg
-              className="animate-spin h-8 w-8 text-blue-500 mr-3"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            Loading products...
+          <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm">
+            {/* You'll need to import a Spinner or LoadingDots component, or create a simple one */}
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <div className="text-lg font-medium mb-2">Loading sessions...</div>
+            <p className="text-sm text-muted-foreground">
+              Please wait while we fetch your data.
+            </p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm text-red-500">
@@ -1352,19 +1542,47 @@ export default function AssetApproval({ appliedFilters = {} }) {
           </div>
         ) : filteredProducts.length > 0 ? (
           <div className="space-y-4">
-            {filteredProducts.map((product) => (
-              <ProductRow
-                key={product.id}
-                product={product}
-                selectedImages={selectedImages}
-                onToggleSelect={toggleImageSelection}
-                onSelectAll={() => selectAllImages(product.id)}
-                // Pass imageStatus, imageId, notes, and comments to onViewImage
-                onViewImage={(url, type, status, id, notes, comments) =>
-                  viewImage(url, product, type, status, id, notes, comments)
-                }
-              />
-            ))}
+            <LoadingModal
+              isOpen={isDeleting}
+              deletedCount={deletedCount}
+              totalCount={totalImagesToDelete}
+            />
+            {filteredProducts.map(
+              (product) => (
+                console.log("Rendering ProductRow for product:", product),
+                (
+                  <ProductRow
+                    product={product}
+                    selectedImages={selectedImages}
+                    onToggleSelect={toggleImageSelection}
+                    onDeleteSelected={() => onDeleteSelected(product.id)}
+                    onPromoteSelected={() => onPromoteSelected(product.id)}
+                    onSelectAll={() => selectAllImages(product.id)}
+                    // Pass imageStatus, imageId, notes, and comments to onViewImage
+                    onViewImage={(
+                      url,
+                      type,
+                      status,
+                      id,
+                      notes,
+                      comments,
+                      versionHistory
+                    ) =>
+                      viewImage(
+                        url,
+                        product,
+                        type,
+                        status,
+                        id,
+                        notes,
+                        comments,
+                        versionHistory
+                      )
+                    }
+                  />
+                )
+              )
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm">
@@ -1397,51 +1615,407 @@ export default function AssetApproval({ appliedFilters = {} }) {
         onOpenChange={(open) =>
           setViewImageDialog({ ...viewImageDialog, open })
         }
-        style={{ height: "90%" }}
       >
-        <DialogContent
-          className="max-w-4xl"
-          style={{ height: "90%", overflowY: "scroll" }}
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {viewImageDialog.product && (
-                <div className="flex items-center justify-between">
-                  <span>{viewImageDialog.product?.code}</span>
-                  <Badge>{viewImageDialog.imageType}</Badge>
+        <DialogContent className="max-w-6xl h-[90vh] flex p-0 overflow-hidden">
+          {/* Left Side - Fixed (Image + Versions) */}
+          <div className="w-2/3 flex flex-col p-6 border-r">
+            {/* Main Image - Fixed height */}
+            <div className="h-[70%] bg-gray-50 rounded-lg flex items-center justify-center">
+              <img
+                src={
+                  selectedVersion?.data?.imageURL ||
+                  viewImageDialog.url ||
+                  "/placeholder.svg"
+                }
+                alt="Main preview"
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+
+            <div className="mt-4 flex-1">
+              <h3 className="text-sm font-medium mb-2">Image Versions</h3>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {/* Original Image */}
+
+                <div className="flex flex-col items-center">
+                  <div
+                    className="flex-shrink-0 w-20 h-20 border-2 border-dashed rounded-md cursor-pointer flex items-center justify-center text-gray-400 hover:border-blue-500"
+                    onClick={() =>
+                      openImageVersionDialog(
+                        viewImageDialog.imageId,
+                        viewImageDialog?.product?.id
+                      )
+                    } // use correct imageId/sessionId
+                  >
+                    <span className="text-3xl font-light">+</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    Upload
+                  </span>
                 </div>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex justify-center">
-            <div className="relative w-full aspect-square">
-              {viewImageDialog.url && (
-                <img
-                  src={viewImageDialog.url || "/placeholder.svg"}
-                  alt="Image preview"
-                  className="object-contain w-full h-full"
-                />
-              )}
+
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex-shrink-0 w-20 h-20 border rounded-md cursor-pointer relative hover:border-blue-500 ${
+                      !selectedVersion ? "border-blue-500" : ""
+                    }`}
+                    onClick={() => setSelectedVersion(null)}
+                  >
+                    <img
+                      src={viewImageDialog.url || "/placeholder.svg"}
+                      alt="Current Version"
+                      className="w-full h-full object-contain p-1"
+                    />
+                    {!selectedVersion && (
+                      <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
+                        Current
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    V{viewImageDialog.versionHistory?.length + 1}
+                  </span>
+                </div>
+
+                {/* Version History */}
+                {[...(viewImageDialog.versionHistory || [])]
+                  .sort((a, b) => b.versionNumber - a.versionNumber) // Sort descending
+                  .map((version) => (
+                    <div
+                      key={version._id}
+                      className="flex flex-col items-center"
+                    >
+                      <div
+                        className={`flex-shrink-0 w-20 h-20 border rounded-md cursor-pointer relative hover:border-blue-500 ${
+                          selectedVersion?._id === version._id
+                            ? "border-blue-500"
+                            : ""
+                        }`}
+                        onClick={() => setSelectedVersion(version)}
+                      >
+                        <img
+                          src={version.data.imageURL}
+                          alt={`Version ${version.versionNumber}`}
+                          className="w-full h-full object-contain p-1"
+                        />
+                        {selectedVersion?._id === version._id && (
+                          <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
+                            Selected
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground mt-1">
+                        V{version.versionNumber}
+                      </span>
+                    </div>
+                  ))}
+              </div>
             </div>
           </div>
-          {/* Notes and Comments Section */}
 
-          <div className="flex justify-between mt-4">
-            {/* Approve Button */}
-            {viewImageDialog.imageStatus.toUpperCase() === "SHOT" ||
-            viewImageDialog.imageStatus.toUpperCase() === "IN PROGRESS" ? (
-              <Button onClick={handleApproveImage}>
+          {/* Right Side - Scrollable Content */}
+          <div className="w-1/3 flex flex-col overflow-y-auto p-6">
+            {/* Product Info */}
+            <div className="mb-6">
+              <h3 className="text-sm font-medium mb-2">Product Details</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="text-muted-foreground">Season:</div>
+                <div>{viewImageDialog.product?.season || "-"}</div>
+
+                <div className="text-muted-foreground">Class:</div>
+                <div>{viewImageDialog.product?.merchandisingClass || "-"}</div>
+
+                <div className="text-muted-foreground">Gender:</div>
+                <div>{viewImageDialog.product?.gender || "-"}</div>
+
+                <div className="text-muted-foreground">Status:</div>
+                <div>
+                  <Badge variant="secondary">
+                    {viewImageDialog.imageStatus}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Notes Section with Edit Capability */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-sm font-medium">Notes</h3>
+              </div>
+              <div className="bg-gray-50 rounded-md p-3 min-h-24 max-h-40 overflow-y-auto">
+                {viewImageDialog.notes && viewImageDialog.notes.length > 0 ? (
+                  // Map over the notes array if it exists and has items
+                  viewImageDialog.notes.map((note, index) => (
+                    <p
+                      style={{ fontSize: 14 }}
+                      key={index}
+                      className="whitespace-pre-wrap"
+                    >
+                      {note}
+                    </p>
+                  ))
+                ) : (
+                  // Show "No notes added" if the array is empty or doesn't exist
+                  <p className="text-muted-foreground italic">No notes added</p>
+                )}
+              </div>
+              {/* Note Editor (would be conditionally shown) */}
+              <Textarea
+                placeholder="Add a Note..."
+                className="min-h-[60px] mt-2"
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+              />
+              <Button onClick={handleSaveNotes} className="mt-2" size="sm">
+                Add Note
+              </Button>
+            </div>
+
+            <div className="mb-6 flex-1">
+              <h3 className="text-sm font-medium mb-2">Comments</h3>
+              <div className="bg-gray-50 rounded-md p-3 max-h-60 overflow-y-auto mb-2">
+                {viewImageDialog.versionHistory?.length > 0 ? (
+                  <div className="space-y-3">
+                    {viewImageDialog.versionHistory.map((version) => (
+                      <div key={version._id} className="text-sm">
+                        <div className="font-medium">
+                          Version {version.versionNumber}
+                        </div>
+                        <div className="text-muted-foreground text-xs">
+                          {dayjs(version.createdAt).fromNow()}
+                        </div>
+                        <p className="mt-1">{version.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground italic">
+                    No version comments yet
+                  </p>
+                )}
+              </div>
+            </div>
+            {/* Action Buttons */}
+            <div className="flex justify-between gap-2 pt-4 border-t sticky bottom-0 bg-background">
+              {/* <Button variant="outline" className="flex-1">
+                <X className="mr-2 h-4 w-4" />
+                Reject
+              </Button> */}
+              <Button onClick={handleApproveImage} className="flex-1">
                 <Check className="mr-2 h-4 w-4" />
                 Approve
               </Button>
-            ) : null}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={promoteModal.open}
+        onOpenChange={(open) => setPromoteModal({ ...promoteModal, open })}
+      >
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Promote Selected Images</DialogTitle>
+          </DialogHeader>
 
-            {/* Reject Button (Always show for flexibility, or you can condition it) */}
-            <Button variant="outline" onClick={handleRejectImage}>
-              <X className="mr-2 h-4 w-4" />
-              Reject
+          {/* SHOT Images Section */}
+          {promoteModal.shotImages.length > 0 && (
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-medium">
+                  SHOT Images ({promoteModal.shotImages.length})
+                </h3>
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    // Move all SHOT images to IN PROGRESS
+                    setIsExporting(true);
+                    const BEARER_TOKEN = localStorage.getItem("token");
+                    const successfulUpdates = [];
+
+                    for (const image of promoteModal.shotImages) {
+                      try {
+                        const response = await axios.put(
+                          `${API_BASE_URL}/admin/send/${image.id}`,
+                          { status: "IN PROGRESS" },
+                          {
+                            headers: {
+                              Authorization: `Bearer ${BEARER_TOKEN}`,
+                            },
+                          }
+                        );
+                        if (response.status === 200) {
+                          successfulUpdates.push(image.id);
+                        }
+                      } catch (error) {
+                        console.error(
+                          `Failed to update image ${image.id}:`,
+                          error
+                        );
+                      }
+                    }
+
+                    setIsExporting(false);
+                    if (successfulUpdates.length > 0) {
+                      alert(
+                        `Successfully moved ${successfulUpdates.length} images to IN PROGRESS`
+                      );
+                      fetchProducts(); // Refresh data
+                    }
+                    setPromoteModal({ ...promoteModal, open: false });
+                  }}
+                  disabled={isExporting}
+                >
+                  {isExporting ? "Processing..." : "Move All to IN PROGRESS"}
+                </Button>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                {promoteModal.shotImages.map((image) => (
+                  <div key={image.id} className="relative border rounded p-1">
+                    <img
+                      src={image.url}
+                      alt="Selected for promotion"
+                      className="w-full h-20 object-contain"
+                    />
+                    <div className="absolute top-1 right-1">
+                      <Checkbox
+                        checked={selectedImages[image.id]}
+                        onCheckedChange={() => toggleImageSelection(image.id)}
+                        className="h-4 w-4 bg-white"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* IN PROGRESS Images Section */}
+          {promoteModal.inProgressImages.length > 0 && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-medium">
+                  IN PROGRESS Images ({promoteModal.inProgressImages.length})
+                </h3>
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    // Move all IN PROGRESS images to APPROVED
+                    setIsExporting(true);
+                    const BEARER_TOKEN = localStorage.getItem("token");
+                    const successfulUpdates = [];
+
+                    for (const image of promoteModal.inProgressImages) {
+                      try {
+                        const response = await axios.put(
+                          `${API_BASE_URL}/admin/send/${image.id}`,
+                          { status: "READY" },
+                          {
+                            headers: {
+                              Authorization: `Bearer ${BEARER_TOKEN}`,
+                            },
+                          }
+                        );
+                        if (response.status === 200) {
+                          successfulUpdates.push(image.id);
+                        }
+                      } catch (error) {
+                        console.error(
+                          `Failed to update image ${image.id}:`,
+                          error
+                        );
+                      }
+                    }
+
+                    setIsExporting(false);
+                    if (successfulUpdates.length > 0) {
+                      alert(
+                        `Successfully moved ${successfulUpdates.length} images to READY`
+                      );
+                      fetchProducts(); // Refresh data
+                    }
+                    setPromoteModal({ ...promoteModal, open: false });
+                  }}
+                  disabled={isExporting}
+                >
+                  {isExporting ? "Processing..." : "Move All to APPROVED"}
+                </Button>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                {promoteModal.inProgressImages.map((image) => (
+                  <div key={image.id} className="relative border rounded p-1">
+                    <img
+                      src={image.url}
+                      alt="Selected for promotion"
+                      className="w-full h-20 object-contain"
+                    />
+                    <div className="absolute top-1 right-1">
+                      <Checkbox
+                        checked={selectedImages[image.id]}
+                        onCheckedChange={() => toggleImageSelection(image.id)}
+                        className="h-4 w-4 bg-white"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setPromoteModal({ ...promoteModal, open: false })}
+            >
+              Close
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={imageModal.open}
+        onOpenChange={(val) => setImageModal({ ...imageModal, open: val })}
+      >
+        <DialogContent className="space-y-4 max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Upload Image Version</DialogTitle>
+          </DialogHeader>
+
+          {isUploading ? (
+            <div className="mt-2 space-y-1 text-sm text-blue-600 w-full">
+              Uploading image...
+              <div className="w-full bg-gray-200 h-2 rounded">
+                <div
+                  className="bg-blue-500 h-2 rounded transition-all duration-200"
+                  style={{
+                    width: `${uploadProgress}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Input
+                  id="image-file"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setNewImage({
+                      ...newImage,
+                      file: e.target.files?.[0] || null,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={handleVersionUpload} disabled={!newImage.file}>
+                  Upload
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
