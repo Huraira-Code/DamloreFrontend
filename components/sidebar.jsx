@@ -157,19 +157,18 @@ export default function Sidebar({
   const handleLogout = () => {
     // Remove the token from local storage
     localStorage.removeItem("token");
+    localStorage.removeItem("role");
 
     // Optional: redirect to login or home page
     window.location.href = "/login"; // or use your router
   };
-
   // Function to clear all filters
   const baseClasses = "flex items-center gap-3 px-3 py-2 text-sm rounded-md";
   const activeClasses = "bg-blue-50 text-blue-600";
   const inactiveClasses = "hover:bg-slate-100 text-slate-500";
-  const BEARER_TOKEN =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODQxMzNiZjA3MGVjMjY0NThlOTIxZjYiLCJlbWFpbCI6Imh1cmFpcmFzaGFoaWQwMDBAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzQ5MTAzNTk5LCJleHAiOjE3NTE2OTU1OTl9.ZvZr2jE2pEpxMnn4bYKdkqY1GoDmhts2zCecekHbbSA";
 
   const fetchUsers = async () => {
+    const BEARER_TOKEN = localStorage.getItem("token");
     try {
       const response = await axios.get(`${API_BASE_URL}/admin/users`, {
         headers: {

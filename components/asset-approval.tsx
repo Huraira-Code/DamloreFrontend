@@ -158,6 +158,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
     imageType: "",
     imageStatus: "",
     imageId: "",
+    sku: "",
     notes: "", // Added notes to the dialog state
     comments: "", // Added comments to the dialog state
     versionHistory: [], // Added version history to the dialog state
@@ -637,6 +638,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
     imageStatus: string,
     imageId: string,
     notes: string = "",
+    sku: string = "",
     comments: string = "",
     versionHistory: any[] = []
   ) => {
@@ -647,6 +649,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
       imageStatus,
       imageId,
       notes,
+      sku,
       comments,
       versionHistory,
     });
@@ -658,6 +661,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
       imageStatus,
       imageId,
       notes, // Set existing notes
+      sku,
       comments, // Set existing comments
       versionHistory,
     });
@@ -1564,6 +1568,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
                       type,
                       status,
                       id,
+                      sku,
                       notes,
                       comments,
                       versionHistory
@@ -1574,6 +1579,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
                         type,
                         status,
                         id,
+                        sku,
                         notes,
                         comments,
                         versionHistory
@@ -1727,7 +1733,8 @@ export default function AssetApproval({ appliedFilters = {} }) {
 
                 <div className="text-muted-foreground">Gender:</div>
                 <div>{viewImageDialog.product?.gender || "-"}</div>
-
+                <div className="text-muted-foreground">SKU:</div>
+                <div>{viewImageDialog?.sku || "-"}</div>
                 <div className="text-muted-foreground">Status:</div>
                 <div>
                   <Badge variant="secondary">
@@ -1938,7 +1945,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
                   }}
                   disabled={isExporting}
                 >
-                  {isExporting ? "Processing..." : "Move All to APPROVED"}
+                  {isExporting ? "Processing..." : "Move All to READY"}
                 </Button>
               </div>
               <div className="grid grid-cols-5 gap-3">

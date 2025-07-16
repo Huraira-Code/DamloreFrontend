@@ -59,6 +59,29 @@ export default function AllSessions() {
     }
   };
 
+  const updateImageSuccessStatus = async (imageId, newStatus) => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(
+        `${API_BASE_URL}/user/send/${imageId}`,
+        { status: newStatus },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      // Refresh the sessions after status update
+      fetchSessions();
+      setSelectedImage(false); // Close the modal after update
+      alert("Image status updated successfully.");
+    } catch (err) {
+      console.error("Failed to update image status:", err);
+      alert("Error updating status.");
+    }
+  };
+
   if (loading) return <p>Loading sessions...</p>;
   if (error) return <p className="text-red-500">{error}</p>;
 
@@ -215,11 +238,7 @@ export default function AllSessions() {
                 <div className="mt-4 flex justify-center gap-2">
                   <button
                     onClick={() =>
-                      updateImageStatus(
-                        selectedImage._id,
-                        "DELIVERED",
-                        selectedImage.comment || ""
-                      )
+                      updateImageSuccessStatus(selectedImage._id, "DELIVERED")
                     }
                     className="bg-green-500 text-white text-sm px-3 py-1 rounded hover:bg-green-600"
                   >

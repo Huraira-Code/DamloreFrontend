@@ -9,6 +9,7 @@ export default function ClientSidebar({ activePage, setActivePage }) {
   const handleLogout = () => {
     // Remove the token from local storage
     localStorage.removeItem("token");
+    localStorage.removeItem("role");
 
     // Optional: redirect to login or home page
     window.location.href = "/login"; // or use your router

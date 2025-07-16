@@ -179,6 +179,7 @@ export default function ProductRow({
                               image.status,
                               image.id,
                               image.notes,
+                              image.sku,
                               image.comments,
                               image.versionHistory || [] // Pass version history if available
                             ); // Pass notes and comments
