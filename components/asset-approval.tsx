@@ -412,6 +412,31 @@ export default function AssetApproval({ appliedFilters = {} }) {
       );
     }
 
+    if (appliedFilters.selectedClients?.length > 0) {
+      // Create a Set of lowercased client names for efficient lookup
+      const globalSelectedClientNames = new Set(
+        appliedFilters.selectedClients.map((client) =>
+          (client.name || "").toLowerCase()
+        )
+      );
+
+      // Filter the result array based on the assignedUser string
+      result = result.filter((product) => {
+        // Directly use product.assignedUser as the name string
+        const assignedUserName = product.assignedUser; // Changed: No longer accessing .name property
+
+        // Ensure assignedUserName exists and is a string
+        if (
+          typeof assignedUserName === "string" &&
+          assignedUserName.length > 0
+        ) {
+          // Check if the lowercased assigned user's name is in our set of selected client names
+          return globalSelectedClientNames.has(assignedUserName.toLowerCase());
+        }
+        return false; // Exclude products without an assigned user string or an empty string
+      });
+    }
+
     if (activeFilters.merchandisingClass.length > 0) {
       result = result.filter((product) =>
         activeFilters.merchandisingClass.includes(product.merchandisingClass)
@@ -443,7 +468,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
       );
     }
 
-    console.log("merasas", result);
+    console.log("merasas", result, appliedFilters);
     if (currentTab !== "All") {
       console.log("moka 2", currentTab);
       result = result.filter((product) =>
@@ -478,10 +503,33 @@ export default function AssetApproval({ appliedFilters = {} }) {
   };
 
   const toggleImageSelection = (imageId: string) => {
-    setSelectedImages((prev) => ({
-      ...prev, // Ensure previous state is spread correctly
-      [imageId]: !prev[imageId],
-    }));
+    console.log("Image Available", imageId);
+
+    // Toggle the selection state
+    const newSelectedImages = {
+      ...selectedImages,
+      [imageId]: !selectedImages[imageId],
+    };
+
+    setSelectedImages(newSelectedImages);
+
+    // If in promote modal, update the modal state
+    if (promoteModal.open) {
+      setPromoteModal((prev) => {
+        const newShotImages = prev.shotImages.filter(
+          (img) => newSelectedImages[img.id] || img.id !== imageId
+        );
+        const newInProgressImages = prev.inProgressImages.filter(
+          (img) => newSelectedImages[img.id] || img.id !== imageId
+        );
+
+        return {
+          ...prev,
+          shotImages: newShotImages,
+          inProgressImages: newInProgressImages,
+        };
+      });
+    }
   };
 
   const selectAllImages = (productId: string) => {
@@ -1835,12 +1883,16 @@ export default function AssetApproval({ appliedFilters = {} }) {
                 <Button
                   size="sm"
                   onClick={async () => {
-                    // Move all SHOT images to IN PROGRESS
                     setIsExporting(true);
                     const BEARER_TOKEN = localStorage.getItem("token");
                     const successfulUpdates = [];
 
-                    for (const image of promoteModal.shotImages) {
+                    // Only process currently selected images
+                    const imagesToProcess = promoteModal.shotImages.filter(
+                      (img) => selectedImages[img.id]
+                    );
+
+                    for (const image of imagesToProcess) {
                       try {
                         const response = await axios.put(
                           `${API_BASE_URL}/admin/send/${image.id}`,
@@ -1873,7 +1925,9 @@ export default function AssetApproval({ appliedFilters = {} }) {
                   }}
                   disabled={isExporting}
                 >
-                  {isExporting ? "Processing..." : "Move All to IN PROGRESS"}
+                  {isExporting
+                    ? "Processing..."
+                    : "Move Selected to IN PROGRESS"}
                 </Button>
               </div>
               <div className="grid grid-cols-5 gap-3">
@@ -1907,12 +1961,16 @@ export default function AssetApproval({ appliedFilters = {} }) {
                 <Button
                   size="sm"
                   onClick={async () => {
-                    // Move all IN PROGRESS images to APPROVED
                     setIsExporting(true);
                     const BEARER_TOKEN = localStorage.getItem("token");
                     const successfulUpdates = [];
 
-                    for (const image of promoteModal.inProgressImages) {
+                    // Only process currently selected images
+                    const imagesToProcess = promoteModal.shotImages.filter(
+                      (img) => selectedImages[img.id]
+                    );
+
+                    for (const image of imagesToProcess) {
                       try {
                         const response = await axios.put(
                           `${API_BASE_URL}/admin/send/${image.id}`,
@@ -1937,7 +1995,7 @@ export default function AssetApproval({ appliedFilters = {} }) {
                     setIsExporting(false);
                     if (successfulUpdates.length > 0) {
                       alert(
-                        `Successfully moved ${successfulUpdates.length} images to READY`
+                        `Successfully moved ${successfulUpdates.length} images to IN PROGRESS`
                       );
                       fetchProducts(); // Refresh data
                     }
@@ -1945,7 +2003,9 @@ export default function AssetApproval({ appliedFilters = {} }) {
                   }}
                   disabled={isExporting}
                 >
-                  {isExporting ? "Processing..." : "Move All to READY"}
+                  {isExporting
+                    ? "Processing..."
+                    : "Move Selected to READY"}
                 </Button>
               </div>
               <div className="grid grid-cols-5 gap-3">

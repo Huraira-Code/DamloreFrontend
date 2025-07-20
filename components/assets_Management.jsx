@@ -249,162 +249,86 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
     }
   }, [fetchedUsers, isUsersLoading]);
 
-  // --- Filter Logic (using useMemo for performance) ---
-  const filterSessions = useMemo(() => {
-    let filtered = allSessions;
+ const filterSessions = useMemo(() => {
+  let filtered = allSessions;
 
-    // Apply filters based on appliedFilters prop
-    if (Object.keys(appliedFilters).length > 0) {
-      // Example: Filter by SKU (individual input or bulk)
-      if (appliedFilters.skuFilter || appliedFilters.bulkSkuCodes) {
-        const targetSkus = new Set(
-          (appliedFilters.skuFilter ? [appliedFilters.skuFilter] : [])
-            .concat(
-              appliedFilters.bulkSkuCodes
-                ? appliedFilters.bulkSkuCodes.split(/\r?\n/).filter(Boolean)
-                : []
-            )
-            .map((s) => s.toLowerCase())
-        );
-
-        if (targetSkus.size > 0) {
-          console.log("mukesh ambani");
-          console.log(filtered);
-          filtered = filtered.filter((session) =>
-            session.shootingLists.some((list) =>
-              targetSkus.has(list.sku.toLowerCase())
-            )
-          );
-          console.log(filtered);
-        }
-      }
-
-      // Example: Filter by Barcode
-      if (appliedFilters.barcodeFilter || appliedFilters.bulkBarcodeCodes) {
-        const targetBarcodes = new Set(
-          (appliedFilters.barcodeFilter ? [appliedFilters.barcodeFilter] : [])
-            .concat(
-              appliedFilters.bulkBarcodeCodes
-                ? appliedFilters.bulkBarcodeCodes.split(/\r?\n/).filter(Boolean)
-                : []
-            )
-            .map((b) => b.toLowerCase())
-        );
-
-        if (targetBarcodes.size > 0) {
-          filtered = filtered.filter((session) =>
-            session.shootingLists.some((list) =>
-              targetBarcodes.has(list.barcode.toLowerCase())
-            )
-          );
-        }
-      }
-
-      // Example: Filter by Farfetch ID (if you have it on your lists)
-      if (
-        appliedFilters.farfetchIdFilter ||
-        appliedFilters.bulkFarfetchIdCodes
-      ) {
-        const targetFarfetchIds = new Set(
-          (appliedFilters.farfetchIdFilter
-            ? [appliedFilters.farfetchIdFilter]
-            : []
+  // Apply filters based on appliedFilters prop
+  if (Object.keys(appliedFilters).length > 0) {
+    // Filter by Barcode
+    if (appliedFilters.barcodeFilter || appliedFilters.bulkBarcodeCodes) {
+      const targetBarcodes = new Set(
+        (appliedFilters.barcodeFilter ? [appliedFilters.barcodeFilter] : [])
+          .concat(
+            appliedFilters.bulkBarcodeCodes
+              ? appliedFilters.bulkBarcodeCodes.split(/\r?\n/).filter(Boolean)
+              : []
           )
-            .concat(
-              appliedFilters.bulkFarfetchIdCodes
-                ? appliedFilters.bulkFarfetchIdCodes
-                    .split(/\r?\n/)
-                    .filter(Boolean)
-                : []
-            )
-            .map((id) => id.toLowerCase())
-        );
-        if (targetFarfetchIds.size > 0) {
-          filtered = filtered.filter((session) =>
-            session.shootingLists.some(
-              (list) =>
-                targetFarfetchIds.has((list.farfetchId || "").toLowerCase()) // Assuming lists might have farfetchId
-            )
-          );
-        }
-      }
+          .map((b) => b.toLowerCase()))
 
-      // Filter by Merchandising Classes (assuming lists have a merchandisingClass field)
-      if (appliedFilters.selectedMerchandisingClasses?.length > 0) {
-        const selectedClasses = new Set(
-          appliedFilters.selectedMerchandisingClasses.map((c) =>
-            c.toLowerCase()
-          )
-        );
+      if (targetBarcodes.size > 0) {
         filtered = filtered.filter((session) =>
-          session.shootingLists.some((list) =>
-            selectedClasses.has((list.merchandisingClass || "").toLowerCase())
-          )
-        );
-      }
-
-      // Filter by Seasons (assuming sessions or lists have a season field)
-      if (appliedFilters.selectedSeasons?.length > 0) {
-        const selectedSeasons = new Set(
-          appliedFilters.selectedSeasons.map((s) => s.toLowerCase())
-        );
-        filtered = filtered.filter((session) =>
-          session.shootingLists.some(
-            (list) => selectedSeasons.has((list.season || "").toLowerCase()) // Assuming lists might have season
-          )
-        );
-      }
-
-      // Filter by Genders
-      if (appliedFilters.selectedGenders?.length > 0) {
-        const selectedGenders = new Set(
-          appliedFilters.selectedGenders.map((g) => g.toLowerCase())
-        );
-        filtered = filtered.filter((session) =>
-          session.shootingLists.some((list) =>
-            selectedGenders.has((list.gender || "").toLowerCase())
-          )
-        );
-      }
-
-      // Filter by Asset Types (this would typically be a property of the image itself,
-      // or a category for the shooting list, depending on your schema.
-      // For this example, let's assume it's a property of the image.
-      // This filter is more complex as it needs to look deeply into nested images.
-      if (appliedFilters.selectedAssetTypes?.length > 0) {
-        const selectedAssetTypes = new Set(
-          appliedFilters.selectedAssetTypes.map((at) => at.toLowerCase())
-        );
-        filtered = filtered.filter((session) =>
-          session.shootingLists.some((list) =>
-            list.images.some(
-              (image) =>
-                selectedAssetTypes.has((image.assetType || "").toLowerCase()) // Assuming image has an assetType
-            )
-          )
-        );
-      }
-
-      // Filter by Clients (users assigned to sessions or shooting lists)
-      if (appliedFilters.selectedClients?.length > 0) {
-        const selectedClientIds = new Set(
-          appliedFilters.selectedClients
-            .map((client) => client._id)
-            .filter(Boolean)
-        );
-        filtered = filtered.filter(
-          (session) =>
-            selectedClientIds.has(session.assignedUser) || // Session assigned user
-            session.shootingLists.some((list) =>
-              selectedClientIds.has(list.userId)
-            ) // List assigned user
+          targetBarcodes.has((session.barcode || "").toLowerCase())
         );
       }
     }
 
-    return filtered;
-  }, [allSessions, appliedFilters]); // Re-run filtering when allSessions or appliedFilters change
+    // Filter by Merchandising Classes
+    if (appliedFilters.selectedMerchandisingClasses?.length > 0) {
+      const selectedClasses = new Set(
+        appliedFilters.selectedMerchandisingClasses.map((c) => c.toLowerCase())
+      );
+      filtered = filtered.filter((session) =>
+        selectedClasses.has((session.merchandisingclass || "").toLowerCase())
+      );
+    }
 
+    // Filter by Genders
+    if (appliedFilters.selectedGenders?.length > 0) {
+      const selectedGenders = new Set(
+        appliedFilters.selectedGenders.map((g) => g.toLowerCase())
+      );
+      filtered = filtered.filter((session) =>
+        selectedGenders.has((session.gender || "").toLowerCase())
+      );
+    }
+
+    // Filter by Asset Types
+    if (appliedFilters.selectedAssetTypes?.length > 0) {
+      const selectedAssetTypes = new Set(
+        appliedFilters.selectedAssetTypes.map((at) => at.toLowerCase())
+      );
+      filtered = filtered.filter((session) =>
+        selectedAssetTypes.has((session.assetypes || "").toLowerCase())
+      );
+    }
+
+    // Filter by Clients (users assigned to sessions)
+    if (appliedFilters.selectedClients?.length > 0) {
+      const selectedClientIds = new Set(
+        appliedFilters.selectedClients
+          .map((client) => client._id)
+          .filter(Boolean)
+      );
+      filtered = filtered.filter((session) =>
+        selectedClientIds.has(session.assignedUser)
+      );
+    }
+
+    // Filter by Image Status (if images exist in session)
+    if (appliedFilters.selectedStatuses?.length > 0) {
+      const selectedStatuses = new Set(
+        appliedFilters.selectedStatuses.map((s) => s.toLowerCase())
+      );
+      filtered = filtered.filter((session) =>
+        session.imageIDs?.some((image) =>
+          selectedStatuses.has((image.status || "").toLowerCase())
+        )
+      );
+    }
+  }
+
+  return filtered;
+}, [allSessions, appliedFilters]);
   // Update sessionsToDisplay whenever filteredSessions changes
   useEffect(() => {
     console.log("debug2", filterSessions);
@@ -866,166 +790,6 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
             <DialogTitle>Add Shooting List</DialogTitle>
           </DialogHeader>
 
-          {/* {["name", "sku", "barcode", "gender"].map((field) => (
-              <div key={field} className="space-y-2">
-                <Label htmlFor={`shooting-${field}`}>
-                  {field.charAt(0).toUpperCase() + field.slice(1)}
-                </Label>
-                <Input
-                  id={`shooting-${field}`}
-                  value={shootingSessionForm[field]}
-                  onChange={(e) =>
-                    setShootingListForm({
-                      ...shootingListForm,
-                      [field]: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            ))} */}
-
-          {/* <div className="space-y-2">
-              <Label htmlFor="arrival-status">Select Merchandising Class</Label>
-              <Select
-                onValueChange={(value) =>
-                  setShootingSessionForm({
-                    ...shootingSessionForm,
-                    merchandisingclass: value,
-                  })
-                }
-                value={shootingSessionForm.merchandisingclass}
-              >
-                <SelectTrigger id="arrival-status">
-                  <SelectValue placeholder="Select Asset Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SOCKS">SOCKS</SelectItem>
-                  <SelectItem value="SET UNDERWEAR">SET UNDERWEAR</SelectItem>
-                  <SelectItem value="SCARF">SCARF</SelectItem>
-                  <SelectItem value="SMALL LEATHER GOODS">
-                    SMALL LEATHER GOODS
-                  </SelectItem>
-                  <SelectItem value="SUNGLASSES">SUNGLASSES</SelectItem>
-                  <SelectItem value="TIES">TIES</SelectItem>
-                  <SelectItem value="TOWEL">TOWEL</SelectItem>
-                  <SelectItem value="RTW (READY-TO-WEAR)">
-                    RTW (READY-TO-WEAR)
-                  </SelectItem>
-                  <SelectItem value="ACCESSORIES">ACCESSORIES</SelectItem>
-                  <SelectItem value="GLOVES">GLOVES</SelectItem>
-                  <SelectItem value="JEWELRY">JEWELRY</SelectItem>
-                  <SelectItem value="KEY CHAINS">KEY CHAINS</SelectItem>
-                  <SelectItem value="PAPILLONS">PAPILLONS</SelectItem>
-                  <SelectItem value="RINGS">RINGS</SelectItem>
-                  <SelectItem value="BAGS">BAGS</SelectItem>
-                  <SelectItem value="BELTS">BELTS</SelectItem>
-                  <SelectItem value="SHOES">SHOES</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="arrival-status">Select Asset Type</Label>
-              <Select
-                onValueChange={(value) =>
-                  setShootingListForm({ ...shootingListForm, assetypes: value })
-                }
-                value={shootingListForm.assetypes}
-              >
-                <SelectTrigger id="arrival-status">
-                  <SelectValue placeholder="Select Asset Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="On Model">On Model</SelectItem>
-                  <SelectItem value="Ghost">Ghost</SelectItem>
-                  <SelectItem value="Still Life">Still Life</SelectItem>
-                  <SelectItem value="Video">Video</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shooting-list-assign-user">Assign User</Label>
-              <Select
-                onValueChange={(value) =>
-                  setShootingListForm({ ...shootingListForm, user: value })
-                }
-                value={shootingListForm.user}
-                disabled={isUsersLoading || usersError}
-              >
-                <SelectTrigger id="shooting-list-assign-user">
-                  <SelectValue
-                    placeholder={
-                      isUsersLoading
-                        ? "Loading users..."
-                        : usersError
-                        ? "Error loading users"
-                        : "Select a user"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {usersError ? (
-                    <SelectItem value="error" disabled>
-                      <span className="flex items-center text-red-500">
-                        <XCircle className="h-4 w-4 mr-2" /> {usersError}
-                      </span>
-                    </SelectItem>
-                  ) : fetchedUsers.length === 0 && !isUsersLoading ? (
-                    <SelectItem value="no-users" disabled>
-                      No users found
-                    </SelectItem>
-                  ) : (
-                    fetchedUsers.map((user) => (
-                      <SelectItem key={user._id} value={user._id}>
-                        {user.name} (ID: {user._id})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div> */}
-
-          {/* <div className="space-y-2">
-              <Label htmlFor="arrival-status">Select Asset Type</Label>
-              <Select
-                onValueChange={(value) =>
-                  setShootingListForm({ ...shootingListForm, assetypes: value })
-                }
-                value={shootingListForm.assetypes}
-              >
-                <SelectTrigger id="arrival-status">
-                  <SelectValue placeholder="Select Asset Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="On Model">On Model</SelectItem>
-                  <SelectItem value="Ghost">Ghost</SelectItem>
-                  <SelectItem value="Still Life">Still Life</SelectItem>
-                  <SelectItem value="Video">Video</SelectItem>
-                </SelectContent>
-              </Select>
-            </div> */}
-
-          {/* <div className="space-y-2">
-              <Label htmlFor="upload-images">Upload Images</Label>
-              <Input
-                id="upload-images"
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleShootingListImageUpload}
-              />
-              <div className="grid grid-cols-3 gap-2 pt-2">
-                {shootingListForm.images.map((img, idx) => (
-                  <img
-                    key={idx}
-                    src={img}
-                    className="w-full h-24 object-cover rounded"
-                    alt={`Preview ${idx}`}
-                  />
-                ))}
-              </div>
-            </div> */}
 
           <div className="flex justify-end pt-4">
             <Button>Add</Button>
@@ -1209,6 +973,7 @@ export default function DigitalAssetManagementPage({ appliedFilters = {} }) {
           </Card>
         ))
       ) : (
+        
         <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-md border shadow-sm">
           <Info className="h-12 w-12 text-muted-foreground mb-4" />
           <div className="text-lg font-medium mb-2">No sessions found</div>

@@ -294,7 +294,7 @@ export default function Sidebar({
                   <DropdownMenuContent className="w-56">
                     {users.map((client) => (
                       <DropdownMenuCheckboxItem
-                        key={client.name}
+                        key={client._id}
                         checked={selectedClients.includes(client)}
                         onCheckedChange={() => toggleClient(client)}
                       >
